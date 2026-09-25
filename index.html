@@ -97,6 +97,17 @@ button{font:inherit;color:inherit;cursor:pointer}
 .sg h3{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);font-weight:600}
 .sg .ask{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.45}
 .sg .ask b{color:var(--ink);font-weight:600}
+.sg.tight{margin-top:11px;padding:11px}
+.sg.tight input,.sg.tight textarea{margin-top:7px}
+.sg.tight textarea{min-height:52px}
+.sg-item .url{font-size:12.5px;color:var(--accent);word-break:break-all;
+  text-decoration:underline;text-underline-offset:2px;display:block;margin-top:4px}
+.lpmap{margin-top:10px;display:flex;flex-direction:column;gap:9px}
+.lpmap .set{border-left:2px solid var(--line);padding-left:11px}
+.lpmap .set .n{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--faint);font-weight:600}
+.lpmap .set a{display:block;font-size:12.5px;color:var(--accent);word-break:break-all;
+  text-decoration:underline;text-underline-offset:2px;margin-top:2px}
 .sg-lab{display:block;font-size:11px;color:var(--muted);margin-top:10px;margin-bottom:3px;font-weight:500}
 .sg input,.sg textarea{width:100%;font:inherit;font-size:13px;color:var(--ink);background:var(--raise);
   border:1px solid var(--line);border-radius:6px;padding:7px 9px;resize:vertical}
@@ -365,7 +376,21 @@ button{font:inherit;color:inherit;cursor:pointer}
 
     <div class="sec">
       <h2>Landing page</h2>
-      <a class="lp" href="https://www.operationalindustries.com/collections/home-defense" target="_blank" rel="noopener">operationalindustries.com/collections/home-defense</a>
+      <p class="plain">Where each ad set sends people when they click. Every ad set carries its own link, even when they all point to the same place today.</p>
+      <div class="lpmap" id="lpMap"></div>
+
+      <div class="sg tight">
+        <h3>Should any of them point somewhere else?</h3>
+        <p class="ask">Paste the link you would send it to. Add as many as you need, and say which ad set you mean.</p>
+        <div id="lpFields"></div>
+        <button class="addf" type="button" id="lpAdd">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add another link</button>
+        <textarea id="lpNote" placeholder="Which ad set, and why"></textarea>
+        <div class="row"><button class="btn sm" type="button" id="lpSave">Leave note</button></div>
+        <p class="keys">Enter to save, Shift + Enter for a new line.</p>
+        <div class="sg-list" id="lpList"></div>
+      </div>
+
       <dl class="kv">
         <div><dt>Launch</dt><dd>21 Aug 2026</dd></div>
         <div><dt>Round</dt><dd id="kvRound">1</dd></div>
@@ -389,14 +414,17 @@ const ASSETS = [
   { id:'va', kind:'image', src:'assets/statA.png',
     title:'Static A, shot A', spec:'4:5 &middot; 1080 &times; 1350 &middot; PNG &middot; 1.5 MB',
     osc:'On-screen copy: Protect What You Build',
+    lp:'https://www.operationalindustries.com/collections/home-defense',
     file:'OPIN0354_HomeDefense_VA_Single_4x5.png' },
   { id:'vb', kind:'image', src:'assets/statB.png',
     title:'Static B, shot B', spec:'4:5 &middot; 1080 &times; 1350 &middot; PNG &middot; 1.1 MB',
     osc:'Same layout, different shot. The photo is the only variable.',
+    lp:'https://www.operationalindustries.com/collections/home-defense',
     file:'OPIN0354_HomeDefense_VB_Single_4x5.png' },
   { id:'v1', kind:'video', src:'assets/video1.mp4',
     title:'Video 1, Home Defense', spec:'9:16 &middot; 1080 &times; 1920 &middot; 15.4s &middot; MP4',
     osc:'Hook "Every home has tools." Body "Some are meant to build, some are meant to protect." Payoff "Home Defense".',
+    lp:'https://www.operationalindustries.com/collections/home-defense',
     file:'OPIN0354 - Home Defense_1.mp4' }
 ];
 const ROUNDS = [{ n:1, label:'Round 1', live:true }];
@@ -432,7 +460,7 @@ const local = {
   write(v){ try { localStorage.setItem('rc.notes', JSON.stringify(v)); } catch(e){} }
 };
 async function boot(){
-  drawWho(); drawRounds(); drawFields({ h:[], p:[] }); drawAssets();
+  drawWho(); drawRounds(); drawFields({ h:[], p:[] }); drawLpFields([]); drawLpMap(); drawAssets();
   notes = local.read(); redraw();
   try { db = await window.claude?.use?.('db'); } catch(e) { db = null; }
   if (db){
@@ -552,6 +580,7 @@ function drawAssets(){
     if (!v) return;
     setViewer(v); box.hidden = true;
     if (draft && draft.copy){ draft = null; saveSuggestion(); return; }
+    if (draft && draft.lp){ draft = null; saveLp(); return; }
     if (draft) openDraft(draft.asset, draft.at);
   };
   $('#nameSave').onclick = saveName;
@@ -684,6 +713,7 @@ function redraw(){
     });
   });
   drawSuggestions();
+  drawLp();
   drawPreviews();
   $('#kvNotes').textContent = notes.filter(n => n.round === round).length;
   $('#kvRound').textContent = round;
@@ -900,6 +930,91 @@ function drawSuggestions(){
       '</div>';
   }).join('');
 }
+/* ---- landing pages, one per ad set ---- */
+function drawLpMap(){
+  const box = $('#lpMap');
+  if (!box) return;
+  box.innerHTML = ASSETS.map(a =>
+    '<div class="set"><div class="n">' + esc(a.title) + '</div>' +
+    '<a href="' + esc(a.lp) + '" target="_blank" rel="noopener">' +
+    esc(a.lp.replace(/^https?:\/\/(www\.)?/, '')) + '</a></div>'
+  ).join('');
+}
+let lpCount = 1;
+function readLp(){ return [...document.querySelectorAll('.lpf')].map(e => e.value); }
+function drawLpFields(vals){
+  const box = $('#lpFields');
+  if (!box) return;
+  const keep = vals || readLp();
+  let html = '';
+  for (let i = 0; i < lpCount; i++){
+    html += '<div class="fld">' +
+      (lpCount > 1
+        ? '<div class="fldbar"><span class="fnum">Link ' + (i+1) + '</span>' +
+          (i ? '<span class="fldacts"><button class="rmf" type="button" data-lprm="' + i + '" ' +
+               'title="Remove this one" aria-label="Remove link ' + (i+1) + '">&times;</button></span>' : '') +
+          '</div>'
+        : '') +
+      '<input type="text" class="lpf" placeholder="' +
+        (i ? 'Another link' : 'The link it should point to') + '"></div>';
+  }
+  box.innerHTML = html;
+  box.querySelectorAll('.lpf').forEach((e,i) => { if (keep && keep[i] != null) e.value = keep[i]; });
+}
+
+/* ---- landing page notes ---- */
+function drawLp(){
+  const list = $('#lpList');
+  if (!list) return;
+  const mine = notes.filter(n => n.assetId === 'lp' && n.round === round)
+                    .sort((p,q) => (p.createdAt||'').localeCompare(q.createdAt||''));
+  list.innerHTML = mine.map(n =>
+    '<div class="sg-item"><span class="who" style="display:flex;align-items:center;gap:8px">' +
+    '<b>' + esc(n.author) + '</b>' + delUI(n) + '</span>' +
+    (n.urls || (n.url ? [n.url] : [])).map(u =>
+      '<a class="url" href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(u) + '</a>').join('') +
+    (n.text ? '<div class="f"><p>' + esc(n.text) + '</p></div>' : '') +
+    '</div>'
+  ).join('');
+}
+function saveLp(){
+  const U = readLp().map(s => s.trim()).filter(Boolean);
+  const t = $('#lpNote').value.trim();
+  if (!U.length && !t) return;
+  if (!viewer){ draft = { lp:true }; askName(); return; }
+  persist({
+    id: 'l' + Date.now() + Math.random().toString(36).slice(2,7),
+    assetId: 'lp', round, x:null, y:null, t:null,
+    urls: U, text: t,
+    author: viewer, createdAt: new Date().toISOString()
+  });
+  lpCount = 1; drawLpFields([]);
+  $('#lpNote').value = '';
+}
+$('#lpSave').onclick = saveLp;
+$('#lpAdd').onclick = () => {
+  lpCount++; drawLpFields();
+  const f = document.querySelectorAll('.lpf');
+  if (f.length) f[f.length - 1].focus();
+};
+document.addEventListener('click', ev => {
+  const rm = ev.target.closest && ev.target.closest('[data-lprm]');
+  if (!rm) return;
+  const vals = readLp();
+  vals.splice(+rm.dataset.lprm, 1);
+  lpCount = Math.max(1, lpCount - 1);
+  drawLpFields(vals);
+});
+document.addEventListener('keydown', ev => {
+  if (!ev.target.classList || !ev.target.classList.contains('lpf')) return;
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  $('#lpNote').focus();
+});
+$('#lpNote').addEventListener('keydown', ev => {
+  if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); saveLp(); }
+});
+
 function saveSuggestion(){
   const H = readF('h').map(s => s.trim()).filter(Boolean);
   const P = readF('p').map(s => s.trim()).filter(Boolean);
