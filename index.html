@@ -1,3 +1,4 @@
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Review Canvas</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
 <style>
@@ -162,6 +163,12 @@ button{font:inherit;color:inherit;cursor:pointer}
 /* ---------- assets ---------- */
 .stack{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));
   gap:18px;align-items:start;min-width:0}
+.testing{grid-column:1/-1;background:var(--surface);border:1px solid var(--line);
+  border-left:3px solid var(--accent);border-radius:var(--r);padding:13px 16px}
+.testing .lab{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--faint);font-weight:600}
+.testing p{font-family:var(--prose);font-size:15.5px;line-height:1.5;margin-top:5px;
+  max-width:66ch}
 .note-strip{grid-column:1/-1;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
   padding:12px 15px;font-size:13px;color:var(--muted);display:flex;gap:10px;align-items:flex-start}
 .note-strip b{color:var(--ink);font-weight:600}
@@ -349,7 +356,7 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 <div class="bar">
   <div class="bar-in">
     <div class="mark"><b>OPIN0354</b><span>Home&nbsp;Defense</span></div>
-    <div class="rounds" id="rounds"></div>
+    <div class="rounds" id="rounds" data-internal></div>
     <span class="roundstate" id="roundState">No verdict yet</span>
     <div class="bar-sp"></div>
     <div class="vsw" id="vsw" title="Demo only. In production the link decides which view someone gets.">
@@ -443,6 +450,11 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
   </aside>
 
   <main class="stack" id="stack">
+    <div class="testing">
+      <span class="lab">What we are testing</span>
+      <p>Whether the photo is what sells this drop. A and B are the same layout with a
+         genuinely different shot, so the picture is the only thing that changes.</p>
+    </div>
     <div class="note-strip">
       <span>&#9432;</span>
       <span data-internal><b>Click anywhere on a creative to leave a note.</b> No account needed, you type your name once. Under each one you can see how the ad runs in a feed, and if you write your own copy in the brief panel the preview updates as you type.</span><span data-client><b>Click anywhere on an ad to leave a note.</b> No account needed, you type your name once. Each one is shown the way it runs in a feed. Approve it, or send it back and say what needs to change.</span>
@@ -474,7 +486,7 @@ const BRAND = { name:'Operational Industries', initials:'OI',
 const COPY = { headline:'Home Defense',
   primary:'Every home has essential tools. Some are meant to build. Others are meant to protect. Home Defense is a tribute to the mindset that safeguarding your family and home is the ultimate responsibility. operationalindustries.com' };
 
-let round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null;
+let round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
 
 /* ---- which view: the link decides, the switch is for demoing ---- */
 let view = (location.hash || '').replace('#','').toLowerCase() === 'client' ? 'client' : 'creator';
@@ -542,6 +554,17 @@ function verdictOf(assetId){
   return notes.find(n => n.kind === 'verdict' && n.assetId === assetId && n.round === round) || null;
 }
 async function setVerdict(assetId, state){
+  const asset = ASSETS.find(a => a.id === assetId);
+  const had = verdictOf(assetId);
+  /* sending something back without saying why helps nobody */
+  if (state === 'changes' && !(had && had.state === 'changes')){
+    const mine = notes.filter(n => n.assetId === assetId && n.round === round && n.kind !== 'verdict');
+    if (!mine.length && asset){
+      pendingVerdict = { assetId, state };
+      openDraft(asset, asset.kind === 'video' ? { t:0 } : { x:50, y:50 }, 'changes');
+      return;
+    }
+  }
   if (!viewer){ draft = { verdict:{ assetId, state } }; askName(); return; }
   const id = 'v_' + assetId + '_r' + round;
   const cur = verdictOf(assetId);
@@ -671,7 +694,7 @@ function drawAssets(){
     el.innerHTML =
       '<div class="asset-hd">' +
         '<div><h3>' + esc(a.title) + '</h3>' +
-        '<div class="spec">' + a.spec + '</div>' +
+        '<div class="spec" data-internal>' + a.spec + '</div>' +
         '<div class="osc" data-internal>' + esc(a.osc) + '</div></div>' +
         '<div class="hdrow"><span class="stamp" id="s-' + a.id + '" hidden></span>' +
         '<span class="count" id="c-' + a.id + '">0 notes</span></div>' +
@@ -721,13 +744,38 @@ function drawAssets(){
   });
 }
 
-function openDraft(asset, at){
-  draft = { asset, at };
-  if (!viewer){ askName(); return; }
+function openDraft(asset, at, why){
+  draft = { asset, at, why };
   ASSETS.forEach(a => { const k = document.getElementById('k-' + a.id); if (k){ k.hidden = true; k.innerHTML = ''; } });
   const k = document.getElementById('k-' + asset.id);
   k.hidden = false;
+
+  /* ask for the name right here rather than sending them down the page */
+  if (!viewer){
+    k.innerHTML =
+      '<div class="where">One thing first, so the team knows whose note is whose.</div>' +
+      '<input type="text" id="dName" placeholder="Your name" autocomplete="name">' +
+      '<div class="row"><button class="btn" type="button" id="dNameGo">Continue</button>' +
+      '<button class="btn ghost" type="button" id="dNameX">Cancel</button></div>';
+    const inp = k.querySelector('#dName');
+    try { inp.focus({ preventScroll:true }); } catch(e) { inp.focus(); }
+    k.scrollIntoView({ block:'nearest' });
+    const go = () => {
+      const v = inp.value.trim();
+      if (!v) return;
+      setViewer(v);
+      openDraft(asset, at, why);
+    };
+    k.querySelector('#dNameGo').onclick = go;
+    k.querySelector('#dNameX').onclick = () => { k.hidden = true; draft = null; };
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter'){ ev.preventDefault(); go(); } });
+    return;
+  }
+
   k.innerHTML =
+    (why === 'changes'
+      ? '<div class="where">Sending <b>' + esc(asset.title) + '</b> back. What needs to change?</div>'
+      : '') +
     '<div class="where">Note on <b>' + esc(asset.title) + '</b>' +
       (at.t != null ? ' at <b>' + mmss(at.t) + '</b>' : ' at <b>' + Math.round(at.x) + '%, ' + Math.round(at.y) + '%</b>') +
       ' &middot; round ' + round + '</div>' +
@@ -740,7 +788,8 @@ function openDraft(asset, at){
     '<button class="btn ghost" type="button" id="dCancel">Cancel</button>' +
     '<span class="status">Enter to save, Shift + Enter for a new line</span></div>';
   const ta = k.querySelector('#dText');
-  ta.focus();
+  try { ta.focus({ preventScroll:true }); } catch(e) { ta.focus(); }
+  k.scrollIntoView({ block:'nearest' });
   let attached = null;
   const prev = k.querySelector('#dPrev');
   k.querySelector('#dFile').addEventListener('change', async ev => {
@@ -757,7 +806,7 @@ function openDraft(asset, at){
       prev.innerHTML = '<span class="status">That image could not be read. Paste a link instead.</span>';
     }
   });
-  const close = () => { k.hidden = true; draft = null; };
+  const close = () => { k.hidden = true; draft = null; pendingVerdict = null; };
   const save = async () => {
     const t = ta.value.trim();
     const link = k.querySelector('#dLink').value.trim();
@@ -769,7 +818,9 @@ function openDraft(asset, at){
       author: viewer, text: t, img: attached || null, link: link || null,
       createdAt: new Date().toISOString()
     });
-    close();
+    const pv = (pendingVerdict && pendingVerdict.assetId === asset.id) ? pendingVerdict : null;
+    close();                       /* close() clears pendingVerdict, so read it first */
+    if (pv) setVerdict(pv.assetId, pv.state);
   };
   ta.addEventListener('keydown', ev => {
     if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); save(); }
@@ -809,8 +860,8 @@ function redraw(){
           requestAnimationFrame(() => tip.setAttribute('data-on','1'));
         };
         const hide = () => { tip.removeAttribute('data-on'); tip.hidden = true; };
-        b.addEventListener('mouseenter', show);
-        b.addEventListener('mouseleave', hide);
+        b.addEventListener('pointerenter', ev => { if (ev.pointerType === 'mouse') show(); });
+        b.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse') hide(); });
         b.addEventListener('focus', show);
         b.addEventListener('blur', hide);
         b.addEventListener('click', ev => {
