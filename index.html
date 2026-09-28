@@ -191,6 +191,13 @@ button{font:inherit;color:inherit;cursor:pointer}
 .stamp[data-s="changes"]{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
 /* creator-only, hidden on a client link */
 body[data-view="client"] [data-internal]{display:none !important}
+body[data-view="client"] .rail{display:none}
+body[data-view="client"] [data-internal]{display:none !important}
+[data-client]{display:none}
+body[data-view="client"] [data-client]{display:inline}
+body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
+.lpline{font-size:12px;color:var(--muted);padding:0 16px 12px;border-bottom:1px solid var(--line-soft);margin-top:-2px}
+.lpline a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;word-break:break-all}
 
 .canvas{background:var(--ground);border-block:1px solid var(--line-soft);
   display:flex;justify-content:center}
@@ -256,6 +263,8 @@ body[data-view="client"] [data-internal]{display:none !important}
 .adprev-hd{display:flex;align-items:center;gap:10px;margin-bottom:11px;flex-wrap:wrap}
 .adprev-hd .lab{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);font-weight:600}
 .vchips{display:flex;gap:5px;flex-wrap:wrap;margin-left:auto}
+.vchips[hidden]{display:none}
+.stamp[hidden]{display:none}
 .vchip{border:1px solid var(--line);background:var(--surface);border-radius:999px;
   padding:3px 11px;font-size:11.5px;color:var(--muted);white-space:nowrap}
 .vchip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
@@ -356,7 +365,7 @@ body[data-view="client"] [data-internal]{display:none !important}
     <div class="rail-hd">
       <div class="eyebrow">Operational Industries</div>
       <h1>Home Defense new drop</h1>
-      <div class="chips">
+      <div class="chips" data-internal>
         <span class="chip live">Launched</span>
         <span class="chip">Statics + video</span>
         <span class="chip">ROAS target 3.5</span>
@@ -394,11 +403,11 @@ body[data-view="client"] [data-internal]{display:none !important}
         <p class="ask">Write the line you would run instead and <b>the preview under each ad updates as you type</b>. Leave a field blank to keep ours.</p>
         <span class="sg-lab">Headline</span>
         <div id="hFields"></div>
-        <button class="addf" type="button" data-add="h">
+        <button class="addf" type="button" data-internal data-add="h">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add another headline</button>
         <span class="sg-lab">Primary text</span>
         <div id="pFields"></div>
-        <button class="addf" type="button" data-add="p">
+        <button class="addf" type="button" data-internal data-add="p">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add another primary text</button>
         <div class="row"><button class="btn sm" type="button" id="sgSave">Suggest copy</button></div>
         <p class="keys">Enter to save, Shift + Enter for a new line.</p>
@@ -415,7 +424,7 @@ body[data-view="client"] [data-internal]{display:none !important}
         <h3>Should any of them point somewhere else?</h3>
         <p class="ask">Paste the link you would send it to. Add as many as you need, and say which ad set you mean.</p>
         <div id="lpFields"></div>
-        <button class="addf" type="button" id="lpAdd">
+        <button class="addf" type="button" data-internal id="lpAdd">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add another link</button>
         <textarea id="lpNote" placeholder="Which ad set, and why"></textarea>
         <div class="row"><button class="btn sm" type="button" id="lpSave">Leave note</button></div>
@@ -436,7 +445,7 @@ body[data-view="client"] [data-internal]{display:none !important}
   <main class="stack" id="stack">
     <div class="note-strip">
       <span>&#9432;</span>
-      <span><b>Click anywhere on a creative to leave a note.</b> No account needed, you type your name once. Under each one you can see how the ad runs in a feed, and if you write your own copy in the brief panel the preview updates as you type.</span>
+      <span data-internal><b>Click anywhere on a creative to leave a note.</b> No account needed, you type your name once. Under each one you can see how the ad runs in a feed, and if you write your own copy in the brief panel the preview updates as you type.</span><span data-client><b>Click anywhere on an ad to leave a note.</b> No account needed, you type your name once. Each one is shown the way it runs in a feed. Approve it, or send it back and say what needs to change.</span>
     </div>
   </main>
 </div>
@@ -678,6 +687,7 @@ function drawAssets(){
           '<path d="M18 6L6 18M6 6l12 12"/></svg>Needs changes</button>' +
         '<span class="vwho" id="w-' + a.id + '"></span>' +
       '</div>' +
+      '<div class="lpline">Sends to <a href="' + esc(a.lp) + '" target="_blank" rel="noopener">' + esc(a.lp.replace(/^https?:\/\/(www\.)?/, '')) + '</a></div>' +
       '<div class="adprev" id="p-' + a.id + '"></div>' +
       (a.kind === 'video' && a.src
         ? '<div class="vbar"><button class="btn" type="button" id="vt-' + a.id + '">Note this moment</button>' +
@@ -1025,7 +1035,8 @@ function syncPreview(){
     '<button class="vchip" type="button" data-pick="' + v + '" aria-pressed="' +
     (pick === v) + '">' + esc(l) + '</button>').join('');
   document.querySelectorAll('.adprev').forEach(el => {
-    const ch = el.querySelector('.vchips'); if (ch) ch.innerHTML = chips;
+    const ch = el.querySelector('.vchips');
+    if (ch){ ch.innerHTML = opts.length > 1 ? chips : ''; ch.hidden = opts.length < 2; }
     const p = el.querySelector('.post-primary'); if (p) p.textContent = c.primary;
     const h = el.querySelector('.post-bar .h'); if (h) h.textContent = c.headline;
   });
