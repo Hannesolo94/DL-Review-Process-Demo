@@ -8,11 +8,17 @@
 
 create extension if not exists pgcrypto;
 
+-- the database mints its own review link, so inserting a brief is all it takes
+create or replace function public.new_token()
+returns text language sql volatile as $$
+  select replace(replace(replace(encode(gen_random_bytes(18),'base64'),'+','-'),'/','_'),'=','');
+$$;
+
 -- ---------------------------------------------------------------- briefs
 
 create table if not exists public.briefs (
   id         uuid primary key default gen_random_uuid(),
-  token      text unique not null,            -- what lives in the review URL
+  token      text unique not null default public.new_token(),  -- the review link, minted here
   slug       text not null,                   -- PLT0160
   brand      text not null,                   -- PLT
   title      text not null,
