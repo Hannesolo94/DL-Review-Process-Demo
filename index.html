@@ -463,7 +463,7 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 </div>
 
 <script>
-const ASSETS = [
+let ASSETS = [
   { id:'va', kind:'image', src:'assets/statA.png',
     title:'Static A, shot A', spec:'4:5 &middot; 1080 &times; 1350 &middot; PNG &middot; 1.5 MB',
     osc:'On-screen copy: Protect What You Build',
@@ -481,10 +481,35 @@ const ASSETS = [
     file:'OPIN0354 - Home Defense_1.mp4' }
 ];
 const ROUNDS = [{ n:1, label:'Round 1', live:true }];
-const BRAND = { name:'Operational Industries', initials:'OI',
+let BRAND = { name:'Operational Industries', initials:'OI',
                 domain:'operationalindustries.com', cta:'Shop now' };
-const COPY = { headline:'Home Defense',
+let COPY = { headline:'Home Defense',
   primary:'Every home has essential tools. Some are meant to build. Others are meant to protect. Home Defense is a tribute to the mindset that safeguarding your family and home is the ultimate responsibility. operationalindustries.com' };
+
+/* ---- Supabase, used when the link carries a brief token ---- */
+const SB = {
+  url: 'https://yobtgnpwbqcnvedzrmlh.supabase.co',
+  key: 'sb_publishable_aHRdYPgnKxgvM3QSVUqs3Q_8mCqQ3KM',
+  async rpc(fn, body){
+    const r = await fetch(this.url + '/rest/v1/rpc/' + fn, {
+      method:'POST',
+      headers:{ apikey:this.key, Authorization:'Bearer ' + this.key,
+                'Content-Type':'application/json' },
+      body: JSON.stringify(body)
+    });
+    const txt = await r.text();
+    if (!r.ok) throw new Error(txt || ('HTTP ' + r.status));
+    return txt ? JSON.parse(txt) : null;
+  }
+};
+const TOKEN = new URLSearchParams(location.search).get('b');
+/* the database column is `body`; the app has always called it `text` */
+const fromRow = r => ({
+  id:r.id, round:r.round, kind:r.kind, assetId:r.asset_id,
+  x:r.x, y:r.y, t:r.t, author:r.author, text:r.body || '',
+  img:r.img, link:r.link, urls:r.urls, headlines:r.headlines,
+  primaries:r.primaries, state:r.state, createdAt:r.created_at
+});
 
 let round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
 
@@ -533,7 +558,44 @@ const local = {
 };
 async function boot(){
   applyView();
+
+  /* a real brief link: everything comes from Supabase */
+  if (TOKEN){
+    try {
+      const b = await SB.rpc('get_brief', { p_token: TOKEN });
+      if (!b){
+        document.getElementById('stack').innerHTML =
+          '<div class="note-strip"><span>This review link is not valid any more. ' +
+          'Ask whoever sent it for a new one.</span></div>';
+        return;
+      }
+      const d = b.data || {};
+      if (d.assets && d.assets.length) ASSETS = d.assets;
+      if (d.brand) BRAND = d.brand;
+      if (d.copy)  COPY  = d.copy;
+      round = b.round || 1;
+      const mark = document.querySelector('.mark');
+      if (mark) mark.innerHTML = '<b>' + esc(b.slug) + '</b><span>' + esc(b.title) + '</span>';
+      const tl = document.querySelector('.testing p');
+      if (tl && d.testing) tl.textContent = d.testing;
+    } catch(e){
+      document.getElementById('stack').innerHTML =
+        '<div class="note-strip"><span>Could not load this review. ' + esc(e.message) + '</span></div>';
+      return;
+    }
+  }
+
   drawWho(); drawRounds(); drawFields({ h:[], p:[] }); drawLpFields([]); drawLpMap(); drawAssets();
+
+  if (TOKEN){
+    try {
+      notes = (await SB.rpc('get_notes', { p_token: TOKEN }) || []).map(fromRow);
+    } catch(e) { notes = []; }
+    redraw();
+    setStatus('Notes are shared with everyone on this link');
+    return;
+  }
+
   notes = local.read(); redraw();
   try { db = await window.claude?.use?.('db'); } catch(e) { db = null; }
   if (db){
@@ -575,6 +637,13 @@ async function setVerdict(assetId, state){
   notes = notes.filter(n => n.id !== id);
   if (rec) notes.push(rec);
   redraw();
+  if (TOKEN){
+    try {
+      rec ? await SB.rpc('put_note', { p_token: TOKEN, p: rec })
+          : await SB.rpc('del_note', { p_token: TOKEN, p_id: id });
+    } catch(e) { setStatus('That verdict did not save. ' + e.message); }
+    return;
+  }
   if (db){
     try { rec ? await db.doc('notes/' + id).set(rec) : await db.doc('notes/' + id).delete(); return; }
     catch(e) {}
@@ -622,6 +691,11 @@ async function removeNote(id){
   pendingDel = null;
   if (pick === id) pick = 'ours';
   redraw();
+  if (TOKEN){
+    try { await SB.rpc('del_note', { p_token: TOKEN, p_id: id }); }
+    catch(e) { setStatus('That did not delete. ' + e.message); }
+    return;
+  }
   if (db){ try { await db.doc('notes/' + id).delete(); return; } catch(e){} }
   local.write(notes);
 }
@@ -635,6 +709,11 @@ document.addEventListener('click', ev => {
 });
 async function persist(note){
   notes = notes.concat([note]); redraw();
+  if (TOKEN){
+    try { await SB.rpc('put_note', { p_token: TOKEN, p: note }); }
+    catch(e) { setStatus('That note did not save. ' + e.message); }
+    return;
+  }
   if (db){ try { await db.doc('notes/' + note.id).set(note); return; } catch(e){} }
   local.write(notes);
 }
