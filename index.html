@@ -515,6 +515,7 @@ let round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', 
 
 /* ---- which view: the link decides, the switch is for demoing ---- */
 let view = (location.hash || '').replace('#','').toLowerCase() === 'client' ? 'client' : 'creator';
+let viewLocked = false;   /* true on a real brief link: the token already decided */
 function applyView(){
   document.body.dataset.view = view;
   document.querySelectorAll('#vsw [data-view]').forEach(b =>
@@ -522,12 +523,13 @@ function applyView(){
 }
 document.addEventListener('click', ev => {
   const b = ev.target.closest && ev.target.closest('#vsw [data-view]');
-  if (!b) return;
+  if (!b || viewLocked) return;
   view = b.dataset.view;
   try { history.replaceState(null,'', view === 'client' ? '#client' : ' '); } catch(e) {}
   applyView();
 });
 window.addEventListener('hashchange', () => {
+  if (viewLocked) return;
   view = (location.hash || '').replace('#','').toLowerCase() === 'client' ? 'client' : 'creator';
   applyView();
 });
@@ -574,6 +576,11 @@ async function boot(){
       if (d.brand) BRAND = d.brand;
       if (d.copy)  COPY  = d.copy;
       round = b.round || 1;
+      view = (b.view === 'client') ? 'client' : 'creator';
+      viewLocked = true;
+      const sw = document.getElementById('vsw');
+      if (sw) sw.remove();          /* the link is the view, there is nothing to switch */
+      applyView();
       const mark = document.querySelector('.mark');
       if (mark) mark.innerHTML = '<b>' + esc(b.slug) + '</b><span>' + esc(b.title) + '</span>';
       const tl = document.querySelector('.testing p');

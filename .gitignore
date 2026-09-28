@@ -7,3 +7,6 @@ Thumbs.db
 .dsn
 .testtoken
 .oi_token
+.oi_client_token
+.oi_client_token
+.atp_tokens
