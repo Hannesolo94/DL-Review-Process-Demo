@@ -70,6 +70,16 @@ Media is committed to this repo because the demo needs to serve it. In productio
 
 Working demo. Not yet used on a live brief.
 
-Open decisions, all defaulted to the simplest option for now: no approve button, every round visible to everyone, notes on creative and copy only, no done state on notes.
+**Two views.** A client link (`#client`) drops the brief panel entirely: no hypothesis, no
+measurement, no big idea, no designer notes. It carries one plain line saying what the drop is
+testing, the ads as they run, where each one sends, comments, and a verdict. The creator view
+keeps everything. Dillon Cox's call, Sep 28.
+
+**Approve / Needs changes** sits on every asset, one verdict per asset per round. Sending
+something back asks what needs to change first, and attaches that as a note. Approving asks
+nothing.
+
+Open decisions: every round stays visible to everyone, and there is no done state on individual
+notes.
 
 Known limit: a reviewer's name identifies them, it does not authenticate them. Fine among colleagues, worth replacing with a per-reviewer link token before this carries client work.
