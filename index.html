@@ -55,6 +55,15 @@ button{font:inherit;color:inherit;cursor:pointer}
 .rnd[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
 .rnd[disabled]{opacity:.45;cursor:default}
 .who{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);white-space:nowrap}
+/* view switch, demo only: in production the link decides the view */
+.vsw{display:flex;gap:0;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.vsw button{border:0;background:var(--surface);color:var(--muted);padding:5px 12px;
+  font-size:12px;font-weight:600;white-space:nowrap}
+.vsw button[aria-pressed="true"]{background:var(--ink);color:var(--ground)}
+.roundstate{font-size:12px;font-weight:600;padding:4px 11px;border-radius:999px;white-space:nowrap;
+  background:var(--line-soft);color:var(--muted)}
+.roundstate[data-s="done"]{background:color-mix(in srgb,var(--ok) 17%,transparent);color:var(--ok)}
+.roundstate[data-s="changes"]{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
 .who b{color:var(--ink);font-weight:600}
 .linkbtn{background:none;border:none;padding:0;color:var(--accent);
   font-size:12.5px;font-weight:500;text-decoration:underline;text-underline-offset:2px}
@@ -162,8 +171,26 @@ button{font:inherit;color:inherit;cursor:pointer}
 .asset-hd h3{font-size:15.5px}
 .asset-hd .spec{font-size:12px;color:var(--faint);margin-top:3px;font-variant-numeric:tabular-nums}
 .asset-hd .osc{font-family:var(--prose);font-size:14px;color:var(--muted);margin-top:6px}
-.count{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap;
+.count{font-size:12px;color:var(--muted);white-space:nowrap;
   border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-variant-numeric:tabular-nums}
+/* approve / request changes */
+.verdict{display:flex;gap:7px;align-items:center;padding:11px 16px;
+  border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+.vbtn{border:1px solid var(--line);background:var(--surface);color:var(--muted);
+  border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:7px;line-height:1}
+.vbtn svg{width:14px;height:14px;flex:0 0 auto}
+.vbtn.ok:hover,.vbtn.ok[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:var(--surface)}
+.vbtn.no:hover,.vbtn.no[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.vwho{font-size:11.5px;color:var(--faint);margin-left:auto;text-align:right}
+.vwho b{color:var(--ink);font-weight:600}
+.asset[data-v="approved"]{border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
+.asset[data-v="changes"]{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.stamp{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.stamp[data-s="approved"]{background:color-mix(in srgb,var(--ok) 17%,transparent);color:var(--ok)}
+.stamp[data-s="changes"]{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+/* creator-only, hidden on a client link */
+body[data-view="client"] [data-internal]{display:none !important}
 
 .canvas{background:var(--ground);border-block:1px solid var(--line-soft);
   display:flex;justify-content:center}
@@ -314,7 +341,12 @@ button{font:inherit;color:inherit;cursor:pointer}
   <div class="bar-in">
     <div class="mark"><b>OPIN0354</b><span>Home&nbsp;Defense</span></div>
     <div class="rounds" id="rounds"></div>
+    <span class="roundstate" id="roundState">No verdict yet</span>
     <div class="bar-sp"></div>
+    <div class="vsw" id="vsw" title="Demo only. In production the link decides which view someone gets.">
+      <button type="button" data-view="creator">Creator</button>
+      <button type="button" data-view="client">Client</button>
+    </div>
     <div class="who" id="who"></div>
   </div>
 </div>
@@ -331,17 +363,17 @@ button{font:inherit;color:inherit;cursor:pointer}
       </div>
     </div>
 
-    <div class="sec">
+    <div class="sec" data-internal>
       <h2>Hypothesis</h2>
       <p class="prose">Protection as responsibility converts the protector persona, and leading on the front print clears Meta without losing the meaning.</p>
     </div>
 
-    <div class="sec">
+    <div class="sec" data-internal>
       <h2>How we measure it</h2>
       <p class="plain">CPA and ROAS on a 5 to 7 day read against the 3.5x target. Watch which garment sells, it picks the iteration.</p>
     </div>
 
-    <div class="sec">
+    <div class="sec" data-internal>
       <h2>Big idea</h2>
       <p class="prose">Home Defense is about the mindset, not the hardware. Every home has tools that build and tools that protect, and this design treats protecting your family as the ultimate responsibility rather than a power fantasy.</p>
     </div>
@@ -434,6 +466,25 @@ const COPY = { headline:'Home Defense',
   primary:'Every home has essential tools. Some are meant to build. Others are meant to protect. Home Defense is a tribute to the mindset that safeguarding your family and home is the ultimate responsibility. operationalindustries.com' };
 
 let round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null;
+
+/* ---- which view: the link decides, the switch is for demoing ---- */
+let view = (location.hash || '').replace('#','').toLowerCase() === 'client' ? 'client' : 'creator';
+function applyView(){
+  document.body.dataset.view = view;
+  document.querySelectorAll('#vsw [data-view]').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest && ev.target.closest('#vsw [data-view]');
+  if (!b) return;
+  view = b.dataset.view;
+  try { history.replaceState(null,'', view === 'client' ? '#client' : ' '); } catch(e) {}
+  applyView();
+});
+window.addEventListener('hashchange', () => {
+  view = (location.hash || '').replace('#','').toLowerCase() === 'client' ? 'client' : 'creator';
+  applyView();
+});
 const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
   '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>';
@@ -460,6 +511,7 @@ const local = {
   write(v){ try { localStorage.setItem('rc.notes', JSON.stringify(v)); } catch(e){} }
 };
 async function boot(){
+  applyView();
   drawWho(); drawRounds(); drawFields({ h:[], p:[] }); drawLpFields([]); drawLpMap(); drawAssets();
   notes = local.read(); redraw();
   try { db = await window.claude?.use?.('db'); } catch(e) { db = null; }
@@ -476,6 +528,63 @@ async function boot(){
   }
   setStatus(db ? 'Notes are shared with everyone on this link' : 'Notes are saved in this browser');
 }
+/* ---- approve / needs changes, one verdict per asset per round ---- */
+function verdictOf(assetId){
+  return notes.find(n => n.kind === 'verdict' && n.assetId === assetId && n.round === round) || null;
+}
+async function setVerdict(assetId, state){
+  if (!viewer){ draft = { verdict:{ assetId, state } }; askName(); return; }
+  const id = 'v_' + assetId + '_r' + round;
+  const cur = verdictOf(assetId);
+  const rec = (cur && cur.state === state)
+    ? null                                   /* pressing the same one again clears it */
+    : { id, kind:'verdict', assetId, round, state, author: viewer,
+        createdAt: new Date().toISOString(), x:null, y:null, t:null, text:'' };
+  notes = notes.filter(n => n.id !== id);
+  if (rec) notes.push(rec);
+  redraw();
+  if (db){
+    try { rec ? await db.doc('notes/' + id).set(rec) : await db.doc('notes/' + id).delete(); return; }
+    catch(e) {}
+  }
+  local.write(notes);
+}
+document.addEventListener('click', ev => {
+  const ok = ev.target.closest && ev.target.closest('[data-ok]');
+  if (ok) return setVerdict(ok.dataset.ok, 'approved');
+  const no = ev.target.closest && ev.target.closest('[data-no]');
+  if (no) return setVerdict(no.dataset.no, 'changes');
+});
+function drawVerdicts(){
+  let approved = 0, changes = 0;
+  ASSETS.forEach(a => {
+    const v = verdictOf(a.id);
+    const card = document.getElementById('c-' + a.id);
+    const sec = card && card.closest('.asset');
+    if (sec){ v ? sec.dataset.v = v.state : delete sec.dataset.v; }
+    const okB = document.querySelector('[data-ok="' + a.id + '"]');
+    const noB = document.querySelector('[data-no="' + a.id + '"]');
+    if (okB) okB.setAttribute('aria-pressed', String(!!v && v.state === 'approved'));
+    if (noB) noB.setAttribute('aria-pressed', String(!!v && v.state === 'changes'));
+    const st = document.getElementById('s-' + a.id);
+    if (st){
+      st.hidden = !v;
+      if (v){ st.dataset.s = v.state; st.textContent = v.state === 'approved' ? 'Approved' : 'Needs changes'; }
+    }
+    const w = document.getElementById('w-' + a.id);
+    if (w) w.innerHTML = v ? (v.state === 'approved' ? 'Approved by <b>' : 'Sent back by <b>') +
+                             esc(v.author) + '</b>' : '';
+    if (v && v.state === 'approved') approved++;
+    if (v && v.state === 'changes') changes++;
+  });
+  const rs = $('#roundState');
+  if (rs){
+    if (changes){ rs.dataset.s = 'changes'; rs.textContent = changes + (changes === 1 ? ' needs changes' : ' need changes'); }
+    else if (approved === ASSETS.length){ rs.dataset.s = 'done'; rs.textContent = 'Round ' + round + ' approved'; }
+    else { delete rs.dataset.s; rs.textContent = approved + ' of ' + ASSETS.length + ' approved'; }
+  }
+}
+
 async function removeNote(id){
   notes = notes.filter(n => n.id !== id);
   pendingDel = null;
@@ -554,8 +663,20 @@ function drawAssets(){
       '<div class="asset-hd">' +
         '<div><h3>' + esc(a.title) + '</h3>' +
         '<div class="spec">' + a.spec + '</div>' +
-        '<div class="osc">' + esc(a.osc) + '</div></div>' +
-        '<div class="hdrow"><span class="count" id="c-' + a.id + '">0 notes</span></div>' +
+        '<div class="osc" data-internal>' + esc(a.osc) + '</div></div>' +
+        '<div class="hdrow"><span class="stamp" id="s-' + a.id + '" hidden></span>' +
+        '<span class="count" id="c-' + a.id + '">0 notes</span></div>' +
+      '</div>' +
+      '<div class="verdict">' +
+        '<button class="vbtn ok" type="button" data-ok="' + a.id + '" aria-pressed="false">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" ' +
+          'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<path d="M20 6L9 17l-5-5"/></svg>Approve</button>' +
+        '<button class="vbtn no" type="button" data-no="' + a.id + '" aria-pressed="false">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" ' +
+          'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<path d="M18 6L6 18M6 6l12 12"/></svg>Needs changes</button>' +
+        '<span class="vwho" id="w-' + a.id + '"></span>' +
       '</div>' +
       '<div class="adprev" id="p-' + a.id + '"></div>' +
       (a.kind === 'video' && a.src
@@ -581,6 +702,7 @@ function drawAssets(){
     setViewer(v); box.hidden = true;
     if (draft && draft.copy){ draft = null; saveSuggestion(); return; }
     if (draft && draft.lp){ draft = null; saveLp(); return; }
+    if (draft && draft.verdict){ const v = draft.verdict; draft = null; setVerdict(v.assetId, v.state); return; }
     if (draft) openDraft(draft.asset, draft.at);
   };
   $('#nameSave').onclick = saveName;
@@ -650,7 +772,7 @@ function openDraft(asset, at){
 function redraw(){
   let total = 0;
   ASSETS.forEach(a => {
-    const mine = notes.filter(n => n.assetId === a.id && n.round === round)
+    const mine = notes.filter(n => n.assetId === a.id && n.round === round && n.kind !== 'verdict')
                       .sort((p,q) => (p.createdAt||'').localeCompare(q.createdAt||''));
     total += mine.length;
     document.querySelectorAll('.frame[data-asset="' + a.id + '"]').forEach(cv => {
@@ -715,7 +837,8 @@ function redraw(){
   drawSuggestions();
   drawLp();
   drawPreviews();
-  $('#kvNotes').textContent = notes.filter(n => n.round === round).length;
+  drawVerdicts();
+  $('#kvNotes').textContent = notes.filter(n => n.round === round && n.kind !== 'verdict').length;
   $('#kvRound').textContent = round;
 }
 
