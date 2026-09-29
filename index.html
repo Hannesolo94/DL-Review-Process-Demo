@@ -583,6 +583,8 @@ async function boot(){
       applyView();
       const mark = document.querySelector('.mark');
       if (mark) mark.innerHTML = '<b>' + esc(b.slug) + '</b><span>' + esc(b.title) + '</span>';
+      /* the browser tab carries the brief number, so a row of open reviews can be told apart */
+      document.title = (b.title && b.title.indexOf(b.slug) === 0) ? b.title : (b.slug + ' · ' + (b.title || 'Review'));
       const set = (id, v) => { const e = document.getElementById(id); if (e && v) e.textContent = v; };
       set('rBrand',  (d.brand && d.brand.name) || b.brand);
       set('rTitle',  b.title);
