@@ -10,3 +10,4 @@ Thumbs.db
 .oi_client_token
 .oi_client_token
 .atp_tokens
+__pycache__/
