@@ -355,7 +355,7 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 
 <div class="bar">
   <div class="bar-in">
-    <div class="mark"><b>OPIN0354</b><span>Home&nbsp;Defense</span></div>
+    <div class="mark"></div>
     <div class="rounds" id="rounds" data-internal></div>
     <span class="roundstate" id="roundState">No verdict yet</span>
     <div class="bar-sp"></div>
@@ -370,39 +370,35 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 <div class="shell">
   <aside class="rail" id="rail">
     <div class="rail-hd">
-      <div class="eyebrow" id="rBrand">Operational Industries</div>
-      <h1 id="rTitle">Home Defense new drop</h1>
-      <div class="chips" data-internal id="rChips">
-        <span class="chip live">Launched</span>
-        <span class="chip">Statics + video</span>
-        <span class="chip">ROAS target 3.5</span>
-      </div>
+      <div class="eyebrow" id="rBrand"></div>
+      <h1 id="rTitle"></h1>
+      <div class="chips" data-internal id="rChips"></div>
     </div>
 
     <div class="sec" data-internal>
       <h2>Hypothesis</h2>
-      <p class="prose" id="rHypothesis">Protection as responsibility converts the protector persona, and leading on the front print clears Meta without losing the meaning.</p>
+      <p class="prose" id="rHypothesis"></p>
     </div>
 
     <div class="sec" data-internal>
       <h2>How we measure it</h2>
-      <p class="plain" id="rMeasure">CPA and ROAS on a 5 to 7 day read against the 3.5x target. Watch which garment sells, it picks the iteration.</p>
+      <p class="plain" id="rMeasure"></p>
     </div>
 
     <div class="sec" data-internal>
       <h2>Big idea</h2>
-      <p class="prose" id="rBigIdea">Home Defense is about the mindset, not the hardware. Every home has tools that build and tools that protect, and this design treats protecting your family as the ultimate responsibility rather than a power fantasy.</p>
+      <p class="prose" id="rBigIdea"></p>
     </div>
 
     <div class="sec">
       <h2>Meta ad copy</h2>
       <div class="copyblock">
         <div class="lab">Headline</div>
-        <p id="rHeadline">Home Defense</p>
+        <p id="rHeadline"></p>
       </div>
       <div class="copyblock">
         <div class="lab">Primary text</div>
-        <p id="rPrimary">Every home has essential tools. Some are meant to build. Others are meant to protect. Home Defense is a tribute to the mindset that safeguarding your family and home is the ultimate responsibility. operationalindustries.com</p>
+        <p id="rPrimary"></p>
       </div>
 
       <div class="sg">
@@ -440,7 +436,7 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
       </div>
 
       <dl class="kv">
-        <div id="rLaunchRow"><dt>Launch</dt><dd id="rLaunch">21 Aug 2026</dd></div>
+        <div id="rLaunchRow"><dt>Launch</dt><dd id="rLaunch"></dd></div>
         <div><dt>Round</dt><dd id="kvRound">1</dd></div>
         <div><dt>Notes</dt><dd id="kvNotes">0</dd></div>
       </dl>
@@ -463,28 +459,10 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 </div>
 
 <script>
-let ASSETS = [
-  { id:'va', kind:'image', src:'assets/statA.png',
-    title:'Static A, shot A', spec:'4:5 &middot; 1080 &times; 1350 &middot; PNG &middot; 1.5 MB',
-    osc:'On-screen copy: Protect What You Build',
-    lp:'https://www.operationalindustries.com/collections/home-defense',
-    file:'OPIN0354_HomeDefense_VA_Single_4x5.png' },
-  { id:'vb', kind:'image', src:'assets/statB.png',
-    title:'Static B, shot B', spec:'4:5 &middot; 1080 &times; 1350 &middot; PNG &middot; 1.1 MB',
-    osc:'Same layout, different shot. The photo is the only variable.',
-    lp:'https://www.operationalindustries.com/collections/home-defense',
-    file:'OPIN0354_HomeDefense_VB_Single_4x5.png' },
-  { id:'v1', kind:'video', src:'assets/video1.mp4',
-    title:'Video 1, Home Defense', spec:'9:16 &middot; 1080 &times; 1920 &middot; 15.4s &middot; MP4',
-    osc:'Hook "Every home has tools." Body "Some are meant to build, some are meant to protect." Payoff "Home Defense".',
-    lp:'https://www.operationalindustries.com/collections/home-defense',
-    file:'OPIN0354 - Home Defense_1.mp4' }
-];
+let ASSETS = [];
 const ROUNDS = [{ n:1, label:'Round 1', live:true }];
-let BRAND = { name:'Operational Industries', initials:'OI',
-                domain:'operationalindustries.com', cta:'Shop now' };
-let COPY = { headline:'Home Defense',
-  primary:'Every home has essential tools. Some are meant to build. Others are meant to protect. Home Defense is a tribute to the mindset that safeguarding your family and home is the ultimate responsibility. operationalindustries.com' };
+let BRAND = { name:'', initials:'', domain:'', cta:'Shop now' };
+let COPY = { headline:'', primary:'' };
 
 /* ---- Supabase, used when the link carries a brief token ---- */
 const SB = {
@@ -561,6 +539,13 @@ const local = {
 async function boot(){
   applyView();
 
+  /* no link token, nothing to show: the page carries no brief of its own */
+  if (!TOKEN){
+    document.getElementById('stack').innerHTML =
+      '<div class="note-strip"><span>Open the review link you were sent.</span></div>';
+    return;
+  }
+
   /* a real brief link: everything comes from Supabase */
   if (TOKEN){
     try {
@@ -580,6 +565,10 @@ async function boot(){
       viewLocked = true;
       const sw = document.getElementById('vsw');
       if (sw) sw.remove();          /* the link is the view, there is nothing to switch */
+      /* a client link drops the internal parts from the page, not just from sight,
+         so view source shows nothing a client should not read */
+      if (view === 'client')
+        document.querySelectorAll('#rail, #railToggle, [data-internal]').forEach(e => e.remove());
       applyView();
       const mark = document.querySelector('.mark');
       if (mark) mark.innerHTML = '<b>' + esc(b.slug) + '</b><span>' + esc(b.title) + '</span>';
