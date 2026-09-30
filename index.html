@@ -919,6 +919,7 @@ function openDraft(asset, at, why){
 }
 
 function redraw(){
+  drawPreviews();   /* the frames must exist before pins go on them; it only builds once */
   let total = 0;
   ASSETS.forEach(a => {
     const mine = notes.filter(n => n.assetId === a.id && n.round === round && n.kind !== 'verdict')
