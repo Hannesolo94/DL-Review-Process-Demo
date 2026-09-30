@@ -163,6 +163,14 @@ button{font:inherit;color:inherit;cursor:pointer}
 /* ---------- assets ---------- */
 .stack{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));
   gap:18px;align-items:start;min-width:0}
+.ccopy{grid-column:1/-1;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.ccopy[hidden],.ccname[hidden]{display:none}
+.ccopy .lab{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.ccopy .ask{margin:0 0 4px;color:var(--muted, inherit);font-size:13px}
+.ccopy label{font-size:12px;font-weight:600;margin-top:4px}
+.ccopy input,.ccopy textarea{width:100%;box-sizing:border-box;background:var(--ground);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px}
+.ccopy .row{display:flex;align-items:center;gap:10px;margin-top:6px}
+.ccst{font-size:12.5px;color:var(--faint)}
 .testing{grid-column:1/-1;background:var(--surface);border:1px solid var(--line);
   border-left:3px solid var(--accent);border-radius:var(--r);padding:13px 16px}
 .testing .lab{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
@@ -448,8 +456,18 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
   <main class="stack" id="stack">
     <div class="testing">
       <span class="lab">What we are testing</span>
-      <p>Whether the photo is what sells this drop. A and B are the same layout with a
-         genuinely different shot, so the picture is the only thing that changes.</p>
+      <p></p>
+    </div>
+    <!-- Sep 30: client copy edits, switched on per brief with data.clientCopy (CTF: Dave writes his own copy) -->
+    <div class="ccopy" id="clientCopy" hidden>
+      <span class="lab">Want different ad copy?</span>
+      <p class="ask">Change the headline or the text above the ad. Every preview below updates as you type. Send it when it reads right.</p>
+      <label for="ccH">Headline</label>
+      <input type="text" id="ccH" autocomplete="off">
+      <label for="ccP">Text above the ad</label>
+      <textarea id="ccP" rows="3"></textarea>
+      <div class="ccname" id="ccNameRow" hidden><label for="ccName">Your name</label><input type="text" id="ccName" autocomplete="name"></div>
+      <div class="row"><button class="btn sm" type="button" id="ccSave">Send my copy</button><span class="ccst" id="ccStatus"></span></div>
     </div>
     <div class="note-strip">
       <span>&#9432;</span>
@@ -489,7 +507,7 @@ const fromRow = r => ({
   primaries:r.primaries, state:r.state, createdAt:r.created_at
 });
 
-let SLUG = '', round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
+let SLUG = '', CLIENT_COPY = false, round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
 
 /* ---- which view: the link decides, the switch is for demoing ---- */
 let view = (location.hash || '').replace('#','').toLowerCase() === 'client' ? 'client' : 'creator';
@@ -560,6 +578,7 @@ async function boot(){
       if (d.assets && d.assets.length) ASSETS = d.assets;
       if (d.brand) BRAND = d.brand;
       if (d.copy)  COPY  = d.copy;
+      CLIENT_COPY = !!d.clientCopy;
       round = b.round || 1;
       SLUG = b.slug || '';
       view = (b.view === 'client') ? 'client' : 'creator';
@@ -595,6 +614,7 @@ async function boot(){
     }
   }
 
+  setupClientCopy();
   drawWho(); drawRounds(); drawFields({ h:[], p:[] }); drawLpFields([]); drawLpMap(); drawAssets();
 
   if (TOKEN){
@@ -725,6 +745,27 @@ document.addEventListener('click', ev => {
   if (t.dataset.delno){ pendingDel = null; return redraw(); }
   pendingDel = t.dataset.del; redraw();
 });
+function setupClientCopy(){
+  const box = document.getElementById('clientCopy');
+  if (!box || view !== 'client' || !CLIENT_COPY) return;
+  box.hidden = false;
+  $('#ccH').value = COPY.headline || ''; $('#ccP').value = COPY.primary || '';
+  $('#ccNameRow').hidden = !!viewer;
+  ['ccH','ccP'].forEach(id => document.getElementById(id).addEventListener('input', () => { $('#ccStatus').textContent = ''; syncPreview(); }));
+  $('#ccSave').onclick = () => {
+    const h = $('#ccH').value.trim(), p = $('#ccP').value.trim();
+    if (h === (COPY.headline || '') && p === (COPY.primary || '')){ $('#ccStatus').textContent = 'Change something first.'; return; }
+    if (!viewer){
+      const n = $('#ccName').value.trim();
+      if (!n){ $('#ccStatus').textContent = 'Add your name so the team knows it is yours.'; $('#ccName').focus(); return; }
+      setViewer(n); $('#ccNameRow').hidden = true;
+    }
+    persist({ id: 'c' + Date.now() + Math.random().toString(36).slice(2,7), assetId: 'copy', round,
+              x:null, y:null, t:null, headlines: [h || COPY.headline], primaries: [p || COPY.primary], text: '',
+              author: viewer, createdAt: new Date().toISOString() });
+    $('#ccStatus').textContent = 'Sent. Thanks, the team has it.';
+  };
+}
 async function persist(note){
   notes = notes.concat([note]); redraw();
   if (TOKEN){
@@ -1055,7 +1096,15 @@ function pairUp(H, P){
   return out;
 }
 /* your draft is always line 1 of each, unless a toggle swaps one in */
+function clientDraft(){
+  const box = document.getElementById('clientCopy');
+  if (!box || box.hidden) return null;
+  const h = $('#ccH').value.trim(), p = $('#ccP').value.trim();
+  if (h === (COPY.headline || '') && p === (COPY.primary || '')) return null;
+  return { headline: h || COPY.headline, primary: p || COPY.primary };
+}
 function draftCopy(){
+  const cd = clientDraft(); if (cd) return cd;
   const H = readF('h').map(s => (s||'').trim()), P = readF('p').map(s => (s||'').trim());
   if (!H.some(Boolean) && !P.some(Boolean)) return null;
   const hi = (swap && swap.k === 'h') ? swap.i : 0;
