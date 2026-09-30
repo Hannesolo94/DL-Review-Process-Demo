@@ -489,7 +489,7 @@ const fromRow = r => ({
   primaries:r.primaries, state:r.state, createdAt:r.created_at
 });
 
-let round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
+let SLUG = '', round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
 
 /* ---- which view: the link decides, the switch is for demoing ---- */
 let view = (location.hash || '').replace('#','').toLowerCase() === 'client' ? 'client' : 'creator';
@@ -561,6 +561,7 @@ async function boot(){
       if (d.brand) BRAND = d.brand;
       if (d.copy)  COPY  = d.copy;
       round = b.round || 1;
+      SLUG = b.slug || '';
       view = (b.view === 'client') ? 'client' : 'creator';
       viewLocked = true;
       const sw = document.getElementById('vsw');
@@ -621,8 +622,13 @@ async function boot(){
   setStatus(db ? 'Notes are shared with everyone on this link' : 'Notes are saved in this browser');
 }
 /* ---- approve / needs changes, one verdict per asset per round ---- */
-function verdictOf(assetId){
-  return notes.find(n => n.kind === 'verdict' && n.assetId === assetId && n.round === round) || null;
+/* Sep 30 fix: the client's verdict and the team's verdict are separate records. They used to share one id,
+   so a client approval overwrote the reviewer's and was then hidden from the client view. Client verdicts
+   are "vc_" rows, team verdicts "v_" rows, and each view reads its own. */
+function isClientVerdict(n){ return String(n.id || '').startsWith('vc_'); }
+function verdictOf(assetId, forClient = view === 'client'){
+  return notes.find(n => n.kind === 'verdict' && n.assetId === assetId && n.round === round &&
+                         isClientVerdict(n) === forClient) || null;
 }
 async function setVerdict(assetId, state){
   const asset = ASSETS.find(a => a.id === assetId);
@@ -637,8 +643,8 @@ async function setVerdict(assetId, state){
     }
   }
   if (!viewer){ draft = { verdict:{ assetId, state } }; askName(); return; }
-  const id = 'v_' + assetId + '_r' + round;
   const cur = verdictOf(assetId);
+  const id = cur ? cur.id : (view === 'client' ? 'vc_' : 'v_') + (SLUG ? SLUG + '_' : '') + assetId + '_r' + round;
   const rec = (cur && cur.state === state)
     ? null                                   /* pressing the same one again clears it */
     : { id, kind:'verdict', assetId, round, state, author: viewer,
@@ -682,8 +688,11 @@ function drawVerdicts(){
       if (v){ st.dataset.s = v.state; st.textContent = v.state === 'approved' ? 'Approved' : 'Needs changes'; }
     }
     const w = document.getElementById('w-' + a.id);
-    if (w) w.innerHTML = v ? (v.state === 'approved' ? 'Approved by <b>' : 'Sent back by <b>') +
-                             esc(v.author) + '</b>' : '';
+    const cv = view === 'client' ? null : verdictOf(a.id, true);   /* the team also sees the client's call */
+    if (w) w.innerHTML = (v ? (v.state === 'approved' ? 'Approved by <b>' : 'Sent back by <b>') +
+                             esc(v.author) + '</b>' : '') +
+                         (cv ? (v ? ' &middot; ' : '') + 'Client: <b>' + (cv.state === 'approved' ? 'approved' : 'sent back') +
+                               '</b> (' + esc(cv.author) + ')' : '');
     if (v && v.state === 'approved') approved++;
     if (v && v.state === 'changes') changes++;
   });
