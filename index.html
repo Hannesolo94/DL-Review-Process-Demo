@@ -565,10 +565,8 @@ async function boot(){
       viewLocked = true;
       const sw = document.getElementById('vsw');
       if (sw) sw.remove();          /* the link is the view, there is nothing to switch */
-      /* a client link drops the internal parts from the page, not just from sight,
-         so view source shows nothing a client should not read */
-      if (view === 'client')
-        document.querySelectorAll('#rail, #railToggle, [data-internal]').forEach(e => e.remove());
+      /* nothing internal reaches a client page: the client token gets no strategy from
+         the server, and the file ships no brief of its own */
       applyView();
       const mark = document.querySelector('.mark');
       if (mark) mark.innerHTML = '<b>' + esc(b.slug) + '</b><span>' + esc(b.title) + '</span>';
