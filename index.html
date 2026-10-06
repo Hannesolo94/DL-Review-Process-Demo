@@ -359,6 +359,31 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 .btn.ghost{background:none;color:var(--muted);border-color:var(--line)}
 .btn[disabled]{opacity:.45;cursor:default}
 .status{font-size:12px;color:var(--faint);margin-left:auto}
+/* Oct 6: David's review feedback. Name prompt is a popup, every reviewer's verdict shows, notes can be edited,
+   a card for general ideas, and a "done reviewing" marker so nobody has to ask who has finished. */
+.modal{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;
+  background:rgba(0,0,0,.45)}
+.modal[hidden]{display:none}
+.modal-box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;width:min(380px,100%);
+  box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.modal-box h2{margin:0 0 6px;font-size:16px;color:var(--ink)}
+.modal-box p{margin:0 0 12px;font-size:13px;color:var(--muted);line-height:1.45}
+.modal-box input{width:100%;box-sizing:border-box;font:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--line);
+  border-radius:7px;background:var(--raise);color:var(--ink);margin-bottom:12px}
+.vlist{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
+.vchip{font-size:12px;padding:2px 9px;border-radius:999px;background:var(--line-soft);color:var(--muted);white-space:nowrap}
+.vchip[data-s="approved"]{background:rgba(58,143,69,.16);color:#3a8f45}
+.vchip[data-s="changes"]{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.vchip.client{outline:1px dashed currentColor;outline-offset:-1px}
+.donebar{font-size:12.5px;color:var(--muted);margin:0 0 12px;padding:9px 13px;border:1px solid var(--line-soft);
+  border-radius:var(--r);background:var(--surface)}
+.donebar b{color:var(--ink);font-weight:600}
+.donebar[hidden]{display:none}
+.note-edit textarea{width:100%;box-sizing:border-box;min-height:60px;font:inherit;font-size:13px;color:var(--ink);
+  background:var(--raise);border:1px solid var(--line);border-radius:7px;padding:8px 10px;margin:4px 0 6px}
+.general .gnote textarea{width:100%;box-sizing:border-box;min-height:70px;font:inherit;font-size:13.5px;color:var(--ink);
+  background:var(--raise);border:1px solid var(--line);border-radius:7px;padding:9px 11px;margin:8px 0}
+.general .ghint{font-size:12.5px;color:var(--muted);margin-top:4px}
 </style>
 
 <div class="bar">
@@ -532,9 +557,15 @@ window.addEventListener('hashchange', () => {
 const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
   '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>';
+const PEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+  'stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>';
+let editing = null;   /* id of the note being edited */
 function delUI(n){
-  if (n.author !== viewer) return '';
-  return '<span class="note-act">' + (pendingDel === n.id
+  if (!viewer || whoKey(n.author) !== whoKey(viewer)) return '';
+  return '<span class="note-act">' +
+    (n.kind !== 'verdict' && !n.headlines && !n.urls
+      ? '<button class="icon-btn" type="button" data-edit="' + n.id + '" title="Edit your note" aria-label="Edit your note">' + PEN + '</button>' : '') +
+    (pendingDel === n.id
     ? '<span class="confirm">Delete? <button class="yes" type="button" data-delyes="' + n.id + '">Yes</button>' +
       '<button type="button" data-delno="1">No</button></span>'
     : '<button class="icon-btn" type="button" data-del="' + n.id + '" ' +
@@ -623,6 +654,7 @@ async function boot(){
     } catch(e) { notes = []; }
     redraw();
     setStatus('Notes are shared with everyone on this link');
+    if (!viewer) askName();   /* Oct 6: ask for the name up front, in a popup */
     return;
   }
 
@@ -646,13 +678,26 @@ async function boot(){
    so a client approval overwrote the reviewer's and was then hidden from the client view. Client verdicts
    are "vc_" rows, team verdicts "v_" rows, and each view reads its own. */
 function isClientVerdict(n){ return String(n.id || '').startsWith('vc_'); }
+/* Oct 6 (David): every reviewer keeps their own verdict, so David approving no longer hides Dillon's call.
+   A verdict id ends with the reviewer's name. Older single-verdict rows still count for their author. */
+function whoKey(v){ return String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'someone'; }
+function verdictsOf(assetId, forClient = view === 'client'){
+  return notes.filter(n => n.kind === 'verdict' && n.assetId === assetId && n.round === round &&
+                           isClientVerdict(n) === forClient)
+              .sort((p,q) => (p.createdAt||'').localeCompare(q.createdAt||''));
+}
+function myVerdict(assetId){
+  return verdictsOf(assetId).find(n => whoKey(n.author) === whoKey(viewer)) || null;
+}
+/* the asset's overall state: any "needs changes" wins, otherwise approved once someone approved it */
 function verdictOf(assetId, forClient = view === 'client'){
-  return notes.find(n => n.kind === 'verdict' && n.assetId === assetId && n.round === round &&
-                         isClientVerdict(n) === forClient) || null;
+  const vs = verdictsOf(assetId, forClient);
+  if (!vs.length) return null;
+  return vs.find(v => v.state === 'changes') || vs[vs.length - 1];
 }
 async function setVerdict(assetId, state){
   const asset = ASSETS.find(a => a.id === assetId);
-  const had = verdictOf(assetId);
+  const had = myVerdict(assetId);
   /* sending something back without saying why helps nobody */
   if (state === 'changes' && !(had && had.state === 'changes')){
     const mine = notes.filter(n => n.assetId === assetId && n.round === round && n.kind !== 'verdict');
@@ -663,8 +708,8 @@ async function setVerdict(assetId, state){
     }
   }
   if (!viewer){ draft = { verdict:{ assetId, state } }; askName(); return; }
-  const cur = verdictOf(assetId);
-  const id = cur ? cur.id : (view === 'client' ? 'vc_' : 'v_') + (SLUG ? SLUG + '_' : '') + assetId + '_r' + round;
+  const cur = myVerdict(assetId);
+  const id = cur ? cur.id : (view === 'client' ? 'vc_' : 'v_') + (SLUG ? SLUG + '_' : '') + assetId + '_r' + round + '_' + whoKey(viewer);
   const rec = (cur && cur.state === state)
     ? null                                   /* pressing the same one again clears it */
     : { id, kind:'verdict', assetId, round, state, author: viewer,
@@ -694,25 +739,27 @@ document.addEventListener('click', ev => {
 function drawVerdicts(){
   let approved = 0, changes = 0;
   ASSETS.forEach(a => {
-    const v = verdictOf(a.id);
+    const v = verdictOf(a.id), mineV = myVerdict(a.id);
     const card = document.getElementById('c-' + a.id);
     const sec = card && card.closest('.asset');
     if (sec){ v ? sec.dataset.v = v.state : delete sec.dataset.v; }
     const okB = document.querySelector('[data-ok="' + a.id + '"]');
     const noB = document.querySelector('[data-no="' + a.id + '"]');
-    if (okB) okB.setAttribute('aria-pressed', String(!!v && v.state === 'approved'));
-    if (noB) noB.setAttribute('aria-pressed', String(!!v && v.state === 'changes'));
+    if (okB) okB.setAttribute('aria-pressed', String(!!mineV && mineV.state === 'approved'));
+    if (noB) noB.setAttribute('aria-pressed', String(!!mineV && mineV.state === 'changes'));
     const st = document.getElementById('s-' + a.id);
     if (st){
       st.hidden = !v;
       if (v){ st.dataset.s = v.state; st.textContent = v.state === 'approved' ? 'Approved' : 'Needs changes'; }
     }
     const w = document.getElementById('w-' + a.id);
-    const cv = view === 'client' ? null : verdictOf(a.id, true);   /* the team also sees the client's call */
-    if (w) w.innerHTML = (v ? (v.state === 'approved' ? 'Approved by <b>' : 'Sent back by <b>') +
-                             esc(v.author) + '</b>' : '') +
-                         (cv ? (v ? ' &middot; ' : '') + 'Client: <b>' + (cv.state === 'approved' ? 'approved' : 'sent back') +
-                               '</b> (' + esc(cv.author) + ')' : '');
+    /* everyone's call, by name. The team also sees the client's, marked with a dashed outline. */
+    const chip = (x, cl) => '<span class="vchip' + (cl ? ' client' : '') + '" data-s="' + x.state + '" title="' +
+      (x.state === 'approved' ? 'Approved' : 'Sent back') + ' by ' + esc(x.author) + (cl ? ' (client)' : '') + '">' +
+      (x.state === 'approved' ? '&#10003; ' : '&#10007; ') + esc(x.author) + (cl ? ' (client)' : '') + '</span>';
+    const team = verdictsOf(a.id), cls = view === 'client' ? [] : verdictsOf(a.id, true);
+    if (w) w.innerHTML = (team.length || cls.length)
+      ? '<span class="vlist">' + team.map(x => chip(x, false)).join('') + cls.map(x => chip(x, true)).join('') + '</span>' : '';
     if (v && v.state === 'approved') approved++;
     if (v && v.state === 'changes') changes++;
   });
@@ -722,6 +769,73 @@ function drawVerdicts(){
     else if (approved === ASSETS.length){ rs.dataset.s = 'done'; rs.textContent = 'Round ' + round + ' approved'; }
     else { delete rs.dataset.s; rs.textContent = approved + ' of ' + ASSETS.length + ' approved'; }
   }
+}
+
+function noteBody(n){
+  if (editing === n.id){
+    return '<div class="note-edit"><textarea data-edtext="' + n.id + '">' + esc(n.text || '') + '</textarea>' +
+      '<div class="row"><button class="btn" type="button" data-edsave="' + n.id + '">Save</button>' +
+      '<button class="btn ghost" type="button" data-edcancel="1">Cancel</button></div></div>';
+  }
+  return n.text ? '<div class="note-t">' + esc(n.text) + '</div>' : '';
+}
+async function saveEdit(id){
+  const ta = document.querySelector('[data-edtext="' + id + '"]');
+  const n = notes.find(x => x.id === id);
+  if (!ta || !n) return;
+  const t = ta.value.trim();
+  editing = null;
+  if (t === (n.text || '')) return redraw();
+  n.text = t; redraw();
+  if (TOKEN){
+    try { await SB.rpc('put_note', { p_token: TOKEN, p: n }); }
+    catch(e) { setStatus('That edit did not save. ' + e.message); }
+    return;
+  }
+  if (db){ try { await db.doc('notes/' + n.id).set(n); return; } catch(e){} }
+  local.write(notes);
+}
+document.addEventListener('click', ev => {
+  const e = ev.target.closest && ev.target.closest('[data-edit],[data-edsave],[data-edcancel]');
+  if (!e) return;
+  ev.preventDefault(); ev.stopPropagation();
+  if (e.dataset.edsave) return saveEdit(e.dataset.edsave);
+  if (e.dataset.edcancel){ editing = null; return redraw(); }
+  editing = e.dataset.edit; redraw();
+  const ta = document.querySelector('[data-edtext="' + editing + '"]');
+  if (ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+});
+document.addEventListener('keydown', ev => {
+  const ta = ev.target.closest && ev.target.closest('[data-edtext]');
+  if (!ta) return;
+  if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); saveEdit(ta.dataset.edtext); }
+  if (ev.key === 'Escape'){ editing = null; redraw(); }
+});
+
+/* ---- "I'm done reviewing": one marker per person per round, so the team knows who has finished ---- */
+function isClientMark(n){ return String(n.id || '').startsWith('dc_'); }
+function doneMarks(forClient = view === 'client'){
+  return notes.filter(n => n.kind === 'done' && n.round === round && isClientMark(n) === forClient);
+}
+function myDone(){ return doneMarks().find(n => whoKey(n.author) === whoKey(viewer)) || null; }
+async function markDone(){
+  if (!viewer){ draft = { done:true }; askName(); return; }
+  const cur = myDone();
+  if (cur){ await removeNote(cur.id); drawWho(); return; }   /* pressing it again takes it back */
+  await persist({ id: (view === 'client' ? 'dc_' : 'd_') + (SLUG ? SLUG + '_' : '') + 'r' + round + '_' + whoKey(viewer),
+                  kind:'done', assetId:'general', round, x:null, y:null, t:null, author: viewer, text:'',
+                  createdAt: new Date().toISOString() });
+  drawWho();
+  setStatus("Thanks, the team can see you've finished.");
+}
+function drawDone(){
+  const bar = $('#doneBar');
+  if (!bar) return;
+  const team = doneMarks(), cl = view === 'client' ? [] : doneMarks(true);
+  const fmt = n => { const d = new Date(n.createdAt); return isNaN(d) ? '' : ' (' + d.toLocaleDateString(undefined, { month:'short', day:'numeric' }) + ')'; };
+  const list = team.map(n => '<b>' + esc(n.author) + '</b>' + fmt(n)).concat(cl.map(n => '<b>' + esc(n.author) + '</b> (client)' + fmt(n)));
+  bar.hidden = !list.length;
+  bar.innerHTML = list.length ? 'Finished reviewing round ' + round + ': ' + list.join(', ') : '';
 }
 
 async function removeNote(id){
@@ -808,14 +922,21 @@ function shrink(file, max, q){
 
 function drawWho(){
   $('#who').innerHTML = viewer
-    ? 'Reviewing as <b>' + esc(viewer) + '</b> <button class="linkbtn" id="chWho" type="button">change</button>'
-    : '<span>Not signed in, and you don’t need to be</span>';
+    ? 'Reviewing as <b>' + esc(viewer) + '</b> <button class="linkbtn" id="chWho" type="button">change</button>' +
+      ' &middot; <button class="linkbtn" id="doneBtn" type="button">' + (myDone() ? 'Done &#10003;' : 'I&rsquo;m done reviewing') + '</button>'
+    : '<button class="linkbtn" id="chWho" type="button">Add your name</button>';
   const b = $('#chWho');
-  if (b) b.onclick = () => { const v = window.prompt ? null : null; askName(); };
+  if (b) b.onclick = () => askName();
+  const d = $('#doneBtn');
+  if (d) d.onclick = () => markDone();
 }
 function askName(){
-  const box = $('#nameBox');
-  if (box){ box.hidden = false; box.querySelector('input').focus(); }
+  const box = $('#nameModal');
+  if (!box) return;
+  box.hidden = false;
+  const inp = box.querySelector('input');
+  inp.value = viewer || '';
+  try { inp.focus({ preventScroll:true }); } catch(e) { inp.focus(); }
 }
 function drawRounds(){
   $('#rounds').innerHTML = ROUNDS.map(r =>
@@ -860,17 +981,55 @@ function drawAssets(){
     stack.appendChild(el);
   });
 
+  /* Oct 6: general ideas and comments that are not about one spot on one ad */
+  const gen = document.createElement('section');
+  gen.className = 'asset general'; gen.id = 'general';
+  gen.innerHTML = '<div class="asset-hd"><div><h3>Other ideas and comments</h3>' +
+    '<div class="ghint">Anything that isn&rsquo;t about one spot on one ad: a new idea, a variation to add, a general thought.</div></div>' +
+    '<div class="hdrow"><span class="count" id="c-general">0 notes</span></div></div>' +
+    '<div class="lower"><div class="notes" id="n-general"></div>' +
+    '<div class="gnote"><textarea id="gText" placeholder="Add an idea or comment"></textarea>' +
+    '<div class="row"><button class="btn" type="button" id="gSave">Add comment</button>' +
+    '<span class="status">Enter to save, Shift + Enter for a new line</span></div></div></div>';
+  $('#stack').appendChild(gen);
+  const gSave = async () => {
+    const t = $('#gText').value.trim();
+    if (!t) return;
+    if (!viewer){ draft = { general:true }; askName(); return; }
+    $('#gText').value = '';
+    await persist({ id: 'g' + Date.now() + Math.random().toString(36).slice(2,7), assetId: 'general', round,
+                    x:null, y:null, t:null, author: viewer, text: t, createdAt: new Date().toISOString() });
+  };
+  $('#gSave').onclick = gSave;
+  $('#gText').addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); gSave(); } });
+
+  /* who has finished, shown above the ads */
+  const done = document.createElement('div');
+  done.className = 'donebar'; done.id = 'doneBar'; done.hidden = true;
+  $('#stack').insertBefore(done, $('#stack').firstChild);
+
+  const st = document.createElement('div');
+  st.className = 'row'; st.innerHTML = '<span class="status" id="statusLine"></span>';
+  $('#stack').appendChild(st);
+
+  /* the name prompt is a popup now, so it can't get lost at the bottom of the page */
   const box = document.createElement('div');
-  box.className = 'composer'; box.id = 'nameBox'; box.hidden = true;
-  box.innerHTML = '<div class="where">Type your name once so the team knows whose note is whose.</div>' +
+  box.className = 'modal'; box.id = 'nameModal'; box.hidden = true;
+  box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-labelledby', 'nmH');
+  box.innerHTML = '<div class="modal-box"><h2 id="nmH">Who&rsquo;s reviewing?</h2>' +
+    '<p>Add your name once so everyone can see whose notes and approvals are whose.</p>' +
     '<input type="text" id="nameInput" placeholder="Your name" autocomplete="name">' +
     '<div class="row"><button class="btn" type="button" id="nameSave">Save</button>' +
-    '<span class="status" id="statusLine"></span></div>';
-  $('#stack').appendChild(box);
+    '<button class="btn ghost" type="button" id="nameSkip">Not now</button></div></div>';
+  document.body.appendChild(box);
+  $('#nameSkip').onclick = () => { box.hidden = true; draft = null; pendingVerdict = null; };
+  box.addEventListener('keydown', ev => { if (ev.key === 'Escape'){ box.hidden = true; } });
   const saveName = () => {
     const v = $('#nameInput').value.trim();
     if (!v) return;
-    setViewer(v); box.hidden = true;
+    setViewer(v); box.hidden = true; redraw();
+    if (draft && draft.general){ draft = null; gSave(); return; }
+    if (draft && draft.done){ draft = null; markDone(); return; }
     if (draft && draft.copy){ draft = null; saveSuggestion(); return; }
     if (draft && draft.lp){ draft = null; saveLp(); return; }
     if (draft && draft.verdict){ const v = draft.verdict; draft = null; setVerdict(v.assetId, v.state); return; }
@@ -889,26 +1048,7 @@ function openDraft(asset, at, why){
   k.hidden = false;
 
   /* ask for the name right here rather than sending them down the page */
-  if (!viewer){
-    k.innerHTML =
-      '<div class="where">One thing first, so the team knows whose note is whose.</div>' +
-      '<input type="text" id="dName" placeholder="Your name" autocomplete="name">' +
-      '<div class="row"><button class="btn" type="button" id="dNameGo">Continue</button>' +
-      '<button class="btn ghost" type="button" id="dNameX">Cancel</button></div>';
-    const inp = k.querySelector('#dName');
-    try { inp.focus({ preventScroll:true }); } catch(e) { inp.focus(); }
-    k.scrollIntoView({ block:'nearest' });
-    const go = () => {
-      const v = inp.value.trim();
-      if (!v) return;
-      setViewer(v);
-      openDraft(asset, at, why);
-    };
-    k.querySelector('#dNameGo').onclick = go;
-    k.querySelector('#dNameX').onclick = () => { k.hidden = true; draft = null; };
-    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter'){ ev.preventDefault(); go(); } });
-    return;
-  }
+  if (!viewer){ k.hidden = true; askName(); return; }   /* the popup reopens this note once they've named themselves */
 
   k.innerHTML =
     (why === 'changes'
@@ -1023,8 +1163,7 @@ function redraw(){
       '<div class="note"><div class="note-n">' + (i+1) + '</div><div class="note-b">' +
       '<div class="note-meta"><b>' + esc(n.author) + '</b> &middot; ' +
       (n.t != null ? '<button class="ts" type="button" data-seek="' + n.t + '" data-a="' + a.id + '">' + mmss(n.t) + '</button>' : 'pin ' + Math.round(n.x) + '%, ' + Math.round(n.y) + '%') +
-      delUI(n) + '</div>' +
-      (n.text ? '<div class="note-t">' + esc(n.text) + '</div>' : '') +
+      delUI(n) + '</div>' + noteBody(n) +
       (n.img ? '<img class="note-att" src="' + n.img + '" alt="Reference attached by ' + esc(n.author) + '">' : '') +
       (n.link ? '<a class="note-link" href="' + esc(n.link) + '" target="_blank" rel="noopener">' + esc(n.link) + '</a>' : '') +
       '</div></div>'
@@ -1034,12 +1173,29 @@ function redraw(){
       if (v){ v.currentTime = +b.dataset.seek; v.pause(); v.scrollIntoView({block:'center',behavior:'smooth'}); }
     });
   });
+  drawGeneral();
+  drawDone();
+  drawWho();
   drawSuggestions();
   drawLp();
   drawPreviews();
   drawVerdicts();
-  $('#kvNotes').textContent = notes.filter(n => n.round === round && n.kind !== 'verdict').length;
+  $('#kvNotes').textContent = notes.filter(n => n.round === round && n.kind !== 'verdict' && n.kind !== 'done').length;
   $('#kvRound').textContent = round;
+}
+
+function drawGeneral(){
+  const box = document.getElementById('n-general');
+  if (!box) return;
+  const g = notes.filter(n => n.assetId === 'general' && n.round === round && n.kind !== 'verdict' && n.kind !== 'done')
+                 .sort((p,q) => (p.createdAt||'').localeCompare(q.createdAt||''));
+  const c = document.getElementById('c-general');
+  if (c) c.textContent = g.length + (g.length === 1 ? ' note' : ' notes');
+  box.innerHTML = g.length ? g.map((n,i) =>
+    '<div class="note"><div class="note-n">' + (i+1) + '</div><div class="note-b">' +
+    '<div class="note-meta"><b>' + esc(n.author) + '</b>' + delUI(n) + '</div>' + noteBody(n) +
+    (n.link ? '<a class="note-link" href="' + esc(n.link) + '" target="_blank" rel="noopener">' + esc(n.link) + '</a>' : '') +
+    '</div></div>').join('') : '<div class="empty">Nothing here yet.</div>';
 }
 
 /* ---- copy fields, up to 3 of each ---- */
