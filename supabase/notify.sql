@@ -41,7 +41,7 @@ begin
   select decrypted_secret into v_url from vault.decrypted_secrets where name = 'craft_slack_webhook' limit 1;
   if v_url is null or v_url = '' then return; end if;
   perform net.http_post(url := v_url,
-                        body := jsonb_build_object('text', p_text),
+                        body := jsonb_build_object('text', '<@U0757BQ1RFW> ' || p_text),   -- @Hannes so he gets the ping
                         headers := '{"Content-Type":"application/json"}'::jsonb);
 end; $$;
 revoke all on function public.craft_slack(text) from public, anon, authenticated;
