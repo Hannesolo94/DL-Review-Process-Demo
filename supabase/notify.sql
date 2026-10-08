@@ -66,7 +66,7 @@ begin
   select * into b from public.briefs where id = new.brief_id;
   if b.id is null then return new; end if;
   who := coalesce(new.author, 'Someone');
-  if lower(who) like 'hannes%' then return new; end if;          -- never ping Hannes about himself
+  if craft_is_muted(who) then return new; end if;               -- mute list (Hannes never gets pinged about himself)
   tag := case when new.audience = 'client' then ' (client)' else '' end;
 
   if new.kind = 'done' and tg_op = 'INSERT' then
@@ -109,7 +109,7 @@ returns trigger language plpgsql security definer set search_path = public as $$
 declare b public.briefs;
 begin
   select * into b from public.briefs where id = new.brief_id;
-  if b.id is null or lower(coalesce(new.author, '')) like 'hannes%' then return new; end if;
+  if b.id is null or craft_is_muted(new.author) then return new; end if;
   perform craft_slack(':eyes: *' || coalesce(new.author, 'Someone') || '*'
                       || case when new.audience = 'client' then ' (client)' else '' end
                       || ' opened ' || craft_brief_label(b));
@@ -119,3 +119,14 @@ end; $$;
 drop trigger if exists craft_notify_open on public.review_events;
 create trigger craft_notify_open after insert on public.review_events
   for each row execute function public.craft_notify_open();
+
+-- Oct 8: mute list. Reviewer names matching a pattern here never ping (Hannes, and anyone added later).
+create table if not exists public.craft_alert_mutes (pattern text primary key, note text);
+alter table public.craft_alert_mutes enable row level security;
+insert into public.craft_alert_mutes (pattern, note) values ('hannes%', 'Hannes, his own reviews and his agent''s notes')
+  on conflict do nothing;
+
+create or replace function public.craft_is_muted(p_author text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.craft_alert_mutes m where lower(trim(coalesce(p_author, ''))) like m.pattern);
+$$;
