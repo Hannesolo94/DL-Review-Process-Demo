@@ -66,6 +66,23 @@ button{font:inherit;color:inherit;cursor:pointer}
 .roundstate[data-s="done"]{background:color-mix(in srgb,var(--ok) 17%,transparent);color:var(--ok)}
 .roundstate[data-s="changes"]{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
 .who b{color:var(--ink);font-weight:600}
+.donebtn{position:relative;border:0;border-radius:999px;padding:7px 15px;
+  background:var(--accent);color:var(--accent-ink);font-size:13px;font-weight:700;white-space:nowrap;cursor:pointer}
+.donebtn:not(.is-done){animation:donePulse 2s ease-out infinite}
+.donebtn.is-done{background:color-mix(in srgb,var(--ok) 17%,transparent);color:var(--ok);animation:none}
+@keyframes donePulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}
+  70%{box-shadow:0 0 0 10px color-mix(in srgb,var(--accent) 0%,transparent)}
+  100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 0%,transparent)}}
+@media (prefers-reduced-motion:reduce){.donebtn:not(.is-done){animation:none}}
+.donewrap{position:relative;display:inline-flex}
+.donetip{position:absolute;top:calc(100% + 10px);right:0;z-index:40;width:230px;max-width:calc(100vw - 32px);white-space:normal;text-align:left;
+  background:var(--ink);color:var(--ground);font-size:12.5px;line-height:1.4;font-weight:500;
+  padding:9px 30px 9px 12px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+.donetip[hidden]{display:none}
+.donetip::before{content:"";position:absolute;top:-6px;right:28px;width:12px;height:12px;
+  background:var(--ink);transform:rotate(45deg);border-radius:2px}
+.donetip button{position:absolute;top:5px;right:6px;border:0;background:none;color:inherit;
+  font-size:15px;line-height:1;padding:3px 5px;cursor:pointer;opacity:.75}
 .linkbtn{background:none;border:none;padding:0;color:var(--accent);
   font-size:12.5px;font-weight:500;text-decoration:underline;text-underline-offset:2px}
 
@@ -929,12 +946,29 @@ function shrink(file, max, q){
 function drawWho(){
   $('#who').innerHTML = viewer
     ? 'Reviewing as <b>' + esc(viewer) + '</b> <button class="linkbtn" id="chWho" type="button">change</button>' +
-      ' &middot; <button class="linkbtn" id="doneBtn" type="button">' + (myDone() ? 'Done &#10003;' : 'I&rsquo;m done reviewing') + '</button>'
+      ' &middot; <span class="donewrap"><button class="donebtn' + (myDone() ? ' is-done' : '') + '" id="doneBtn" type="button">' + (myDone() ? 'Done &#10003;' : 'I&rsquo;m done reviewing') + '</button>' +
+      '<span class="donetip" id="doneTip" role="status" hidden>When you&rsquo;re done, press this so we know you&rsquo;ve finished.<button type="button" id="doneTipX" aria-label="Close">&times;</button></span></span>'
     : '<button class="linkbtn" id="chWho" type="button">Add your name</button>';
   const b = $('#chWho');
   if (b) b.onclick = () => askName();
   const d = $('#doneBtn');
-  if (d) d.onclick = () => markDone();
+  if (d) d.onclick = () => { hideDoneTip(); markDone(); };
+  const x = $('#doneTipX');
+  if (x) x.onclick = ev => { ev.stopPropagation(); hideDoneTip(); };
+  if (tipShown && !myDone() && !tipClosed) showDoneTip();
+  logOpen();
+}
+/* Oct 8: a small nudge a minute in, once per visit, so reviewers know to press done */
+let tipShown = false, tipClosed = false;
+function showDoneTip(){ const t = $('#doneTip'); if (t && !myDone()) { t.hidden = false; tipShown = true; } }
+function hideDoneTip(){ const t = $('#doneTip'); if (t) t.hidden = true; tipClosed = true; }
+setTimeout(() => { if (!tipClosed && !myDone()) { tipShown = true; showDoneTip(); } }, 60000);
+/* Oct 8: tell the team who opened the link, once per visit (the database dedupes repeat opens) */
+let openLogged = false;
+function logOpen(){
+  if (openLogged || !viewer || !TOKEN) return;
+  openLogged = true;
+  try { SB.rpc('log_open', { p_token: TOKEN, p_author: viewer }); } catch(e) {}
 }
 function askName(){
   const box = $('#nameModal');
