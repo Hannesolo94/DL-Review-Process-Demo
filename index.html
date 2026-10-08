@@ -958,11 +958,11 @@ function drawWho(){
   if (tipShown && !myDone() && !tipClosed) showDoneTip();
   logOpen();
 }
-/* Oct 8: a small nudge a minute in, once per visit, so reviewers know to press done */
+/* Oct 8: a small nudge 30 seconds in, once per visit, so reviewers know to press done */
 let tipShown = false, tipClosed = false;
 function showDoneTip(){ const t = $('#doneTip'); if (t && !myDone()) { t.hidden = false; tipShown = true; } }
 function hideDoneTip(){ const t = $('#doneTip'); if (t) t.hidden = true; tipClosed = true; }
-setTimeout(() => { if (!tipClosed && !myDone()) { tipShown = true; showDoneTip(); } }, 60000);
+setTimeout(() => { if (!tipClosed && !myDone()) { tipShown = true; showDoneTip(); } }, 30000);
 /* Oct 8: tell the team who opened the link, once per visit (the database dedupes repeat opens) */
 let openLogged = false;
 function logOpen(){

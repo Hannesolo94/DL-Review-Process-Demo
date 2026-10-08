@@ -58,7 +58,7 @@ returns text language sql immutable as $$
                         '\s*\((revised|new)[^)]*\)\s*$', '');
 $$;
 
--- notes: new note, asset sent back, copy suggestion, done
+-- notes: Oct 8 Hannes wants two pings only, 'opened' and 'done' (done lists the notes). The other branches are switched off with `false`.
 create or replace function public.craft_notify_note()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare b public.briefs; who text; tag text; msg text; n_ok int; n_ch int; n_notes int;
@@ -78,17 +78,25 @@ begin
     where brief_id = new.brief_id and kind = 'note' and round = new.round and lower(author) = lower(new.author);
     msg := ':white_check_mark: *' || who || '*' || tag || ' finished reviewing ' || craft_brief_label(b)
            || ': ' || n_ok || ' approved, ' || n_ch || case when n_ch = 1 then ' needs' else ' need' end || ' changes, '
-           || n_notes || case when n_notes = 1 then ' note' else ' notes' end;
+           || n_notes || case when n_notes = 1 then ' note' else ' notes' end
+           || coalesce((select string_agg(E'
+• *' || case when n.asset_id = 'general' then 'General' else craft_asset_title(b, n.asset_id) end
+                                          || '*' || case when n.t is not null then ' at ' || floor(n.t / 60)::int || ':' || lpad((floor(n.t)::int % 60)::text, 2, '0') else '' end
+                                          || ': ' || left(n.body, 300), '' order by n.created_at)
+                        from (select * from public.notes
+                              where brief_id = new.brief_id and kind = 'note' and round = new.round
+                                and lower(author) = lower(new.author) and coalesce(body, '') <> ''
+                              order by created_at limit 12) n), '');
 
-  elsif new.kind = 'verdict' and new.state = 'changes'
+  elsif false and new.kind = 'verdict' and new.state = 'changes'
         and (tg_op = 'INSERT' or old.state is distinct from new.state) then
     msg := ':warning: *' || who || '*' || tag || ' sent back *' || craft_asset_title(b, new.asset_id)
            || '* on ' || craft_brief_label(b);
 
-  elsif new.kind = 'note' and tg_op = 'INSERT' and new.asset_id = 'copy' then
+  elsif false and new.kind = 'note' and tg_op = 'INSERT' and new.asset_id = 'copy' then
     msg := ':pencil2: *' || who || '*' || tag || ' suggested new ad copy on ' || craft_brief_label(b);
 
-  elsif new.kind = 'note' and tg_op = 'INSERT' and coalesce(new.body, '') <> '' then
+  elsif false and new.kind = 'note' and tg_op = 'INSERT' and coalesce(new.body, '') <> '' then
     msg := ':speech_balloon: *' || who || '*' || tag || ' on ' || craft_brief_label(b) || ', *'
            || case when new.asset_id = 'general' then 'general comment' else craft_asset_title(b, new.asset_id) end || '*'
            || case when new.t is not null then ' at ' || floor(new.t / 60)::int || ':' || lpad((floor(new.t)::int % 60)::text, 2, '0') else '' end
@@ -112,7 +120,7 @@ begin
   if b.id is null or craft_is_muted(new.author) then return new; end if;
   perform craft_slack(':eyes: *' || coalesce(new.author, 'Someone') || '*'
                       || case when new.audience = 'client' then ' (client)' else '' end
-                      || ' opened ' || craft_brief_label(b));
+                      || ' opened ' || craft_brief_label(b) || ' and started reviewing');
   return new;
 end; $$;
 
