@@ -965,8 +965,11 @@ function hideDoneTip(){ const t = $('#doneTip'); if (t) t.hidden = true; tipClos
 setTimeout(() => { if (!tipClosed && !myDone()) { tipShown = true; showDoneTip(); } }, 30000);
 /* Oct 8: tell the team who opened the link, once per visit (the database dedupes repeat opens) */
 let openLogged = false;
+/* ?quiet=1 marks this browser as Hannes's agent: it never logs an open (sticks in localStorage) */
+let QUIET = false;
+try { if (new URLSearchParams(location.search).get('quiet')) localStorage.setItem('rc.quiet', '1'); QUIET = localStorage.getItem('rc.quiet') === '1'; } catch(e) {}
 function logOpen(){
-  if (openLogged || !viewer || !TOKEN) return;
+  if (openLogged || QUIET || !viewer || !TOKEN) return;
   openLogged = true;
   try { SB.rpc('log_open', { p_token: TOKEN, p_author: viewer }); } catch(e) {}
 }
