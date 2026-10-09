@@ -529,6 +529,11 @@ let ASSETS = [];
 const ROUNDS = [{ n:1, label:'Round 1', live:true }];
 let BRAND = { name:'', initials:'', domain:'', cta:'Shop now' };
 let COPY = { headline:'', primary:'' };
+/* an ad's own Meta copy when its ad set has different copy, falling back to the brief's copy */
+function assetCopy(a){
+  const c = (a && a.copy) || {};
+  return { headline: c.headline || COPY.headline, primary: c.primary || COPY.primary };
+}
 
 /* ---- Supabase, used when the link carries a brief token ---- */
 const SB = {
@@ -654,6 +659,24 @@ async function boot(){
       set('rBigIdea',    d.strategy && d.strategy.bigIdea);
       set('rHeadline',   d.copy && d.copy.headline);
       set('rPrimary',    d.copy && d.copy.primary);
+      /* several ad sets with their own Meta copy: list every set in the rail, named by its ads */
+      const sets = [];
+      (d.assets || []).forEach(a => {
+        const c = assetCopy(a), key = c.headline + '\u0000' + c.primary;
+        const s = sets.find(x => x.key === key);
+        if (s) s.ads.push(a.title); else sets.push({ key, c, ads: [a.title] });
+      });
+      if (sets.length > 1){
+        const hb = document.getElementById('rHeadline'), pb = document.getElementById('rPrimary');
+        const hc = hb && hb.closest('.copyblock'), pc = pb && pb.closest('.copyblock');
+        if (hc){
+          hc.innerHTML = sets.map(s =>
+            '<div class="lab">' + esc(s.ads.join(', ')) + '</div>' +
+            '<p><b>Headline:</b> ' + esc(s.c.headline) + '</p>' +
+            '<p><b>Primary text:</b> ' + esc(s.c.primary) + '</p>').join('');
+        }
+        if (pc) pc.remove();
+      }
       set('rLaunch',     d.launch);
       const tl = document.querySelector('.testing p');
       if (tl && d.testing) tl.textContent = d.testing;
@@ -1434,8 +1457,11 @@ function syncPreview(){
   document.querySelectorAll('.adprev').forEach(el => {
     const ch = el.querySelector('.vchips');
     if (ch){ ch.innerHTML = opts.length > 1 ? chips : ''; ch.hidden = opts.length < 2; }
-    const p = el.querySelector('.post-primary'); if (p) p.textContent = c.primary;
-    const h = el.querySelector('.post-bar .h'); if (h) h.textContent = c.headline;
+    /* each ad shows its own ad set's copy (asset.copy) unless a draft or suggestion is picked */
+    const a = ASSETS.find(x => 'p-' + x.id === el.id);
+    const own = (pick === 'ours' && a && a.copy) ? assetCopy(a) : c;
+    const p = el.querySelector('.post-primary'); if (p) p.textContent = own.primary;
+    const h = el.querySelector('.post-bar .h'); if (h) h.textContent = own.headline;
   });
 }
 document.addEventListener('click', ev => {
