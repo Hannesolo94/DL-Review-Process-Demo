@@ -128,3 +128,55 @@ create or replace function public.craft_is_muted(p_author text)
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.craft_alert_mutes m where lower(trim(coalesce(p_author, ''))) like m.pattern);
 $$;
+
+-- Oct 14 2026: per-brand review channels (#atp/#ctf/#plt/#tl/#gu/#otx-review-notifications, Hannes + Dillon + David).
+-- Webhooks live in Vault as craft_slack_webhook_<brand lowercase> (e.g. craft_slack_webhook_atp). No secret = nothing sent.
+-- #craft-notifications keeps the one-line "finished reviewing" ping for Hannes; the brand channel gets the full detail,
+-- and when a CLIENT finishes, Dillon is tagged so he can look at the updates.
+create or replace function public.craft_slack_brand(p_brand text, p_text text)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_url text;
+begin
+  select decrypted_secret into v_url from vault.decrypted_secrets
+  where name = 'craft_slack_webhook_' || lower(coalesce(p_brand, '')) limit 1;
+  if v_url is null or v_url = '' then return; end if;
+  perform net.http_post(url := v_url, body := jsonb_build_object('text', p_text),
+                        headers := '{"Content-Type":"application/json"}'::jsonb);
+end; $$;
+revoke all on function public.craft_slack_brand(text, text) from public, anon, authenticated;
+
+create or replace function public.craft_notify_brand_done()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare b public.briefs; who text; n_ok int; n_ch int; msg text; v_assets text; v_notes text; v_copy text;
+begin
+  if new.kind <> 'done' then return new; end if;
+  select * into b from public.briefs where id = new.brief_id;
+  if b.id is null then return new; end if;
+  who := coalesce(new.author, 'Someone');
+  if craft_is_muted(who) then return new; end if;
+  select count(*) filter (where state = 'approved'), count(*) filter (where state = 'changes') into n_ok, n_ch
+  from public.notes where brief_id = new.brief_id and kind = 'verdict' and round = new.round and lower(author) = lower(new.author);
+  -- per-ad verdicts
+  select string_agg(E'\n' || case when v.state = 'approved' then ':white_check_mark: ' else ':x: ' end || craft_asset_title(b, v.asset_id), '' order by v.asset_id)
+    into v_assets
+  from public.notes v where v.brief_id = new.brief_id and v.kind = 'verdict' and v.round = new.round and lower(v.author) = lower(new.author);
+  -- every note in their words
+  select string_agg(E'\n• *' || case when n.asset_id = 'general' then 'General' when n.asset_id = 'copy' then 'Ad copy' else craft_asset_title(b, n.asset_id) end || '*'
+                    || case when n.t is not null then ' at ' || floor(n.t / 60)::int || ':' || lpad((floor(n.t)::int % 60)::text, 2, '0') else '' end
+                    || ': ' || left(n.body, 600), '' order by n.created_at)
+    into v_notes
+  from public.notes n where n.brief_id = new.brief_id and n.kind = 'note' and n.round = new.round
+                        and lower(n.author) = lower(new.author) and coalesce(n.body, '') <> '';
+  msg := case when new.audience = 'client' then '<@U0C0D16NQKY> client update: ' else '' end
+         || ':white_check_mark: *' || who || '*' || case when new.audience = 'client' then ' (client)' else '' end
+         || ' finished reviewing ' || craft_brief_label(b) || ': ' || n_ok || ' approved, ' || n_ch
+         || case when n_ch = 1 then ' needs' else ' need' end || ' changes'
+         || coalesce(E'\n' || v_assets, '')
+         || coalesce(E'\n\n*Notes*' || v_notes, '');
+  perform craft_slack_brand(b.brand, msg);
+  return new;
+end; $$;
+
+drop trigger if exists craft_notify_brand_done on public.notes;
+create trigger craft_notify_brand_done after insert on public.notes
+  for each row execute function public.craft_notify_brand_done();
