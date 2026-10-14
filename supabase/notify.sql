@@ -78,15 +78,7 @@ begin
     where brief_id = new.brief_id and kind = 'note' and round = new.round and lower(author) = lower(new.author);
     msg := ':white_check_mark: *' || who || '*' || tag || ' finished reviewing ' || craft_brief_label(b)
            || ': ' || n_ok || ' approved, ' || n_ch || case when n_ch = 1 then ' needs' else ' need' end || ' changes, '
-           || n_notes || case when n_notes = 1 then ' note' else ' notes' end
-           || coalesce((select string_agg(E'
-• *' || case when n.asset_id = 'general' then 'General' else craft_asset_title(b, n.asset_id) end
-                                          || '*' || case when n.t is not null then ' at ' || floor(n.t / 60)::int || ':' || lpad((floor(n.t)::int % 60)::text, 2, '0') else '' end
-                                          || ': ' || left(n.body, 300), '' order by n.created_at)
-                        from (select * from public.notes
-                              where brief_id = new.brief_id and kind = 'note' and round = new.round
-                                and lower(author) = lower(new.author) and coalesce(body, '') <> ''
-                              order by created_at limit 12) n), '');
+           || n_notes || case when n_notes = 1 then ' note' else ' notes' end;   -- Oct 14: one line only, no notes list (Hannes)
 
   elsif false and new.kind = 'verdict' and new.state = 'changes'
         and (tg_op = 'INSERT' or old.state is distinct from new.state) then
@@ -111,7 +103,7 @@ drop trigger if exists craft_notify_note on public.notes;
 create trigger craft_notify_note after insert or update on public.notes
   for each row execute function public.craft_notify_note();
 
--- opens
+-- opens: Oct 14 Hannes turned these off (#craft-notifications = finished reviewing only). Trigger dropped, function kept.
 create or replace function public.craft_notify_open()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare b public.briefs;
@@ -125,8 +117,6 @@ begin
 end; $$;
 
 drop trigger if exists craft_notify_open on public.review_events;
-create trigger craft_notify_open after insert on public.review_events
-  for each row execute function public.craft_notify_open();
 
 -- Oct 8: mute list. Reviewer names matching a pattern here never ping (Hannes, and anyone added later).
 create table if not exists public.craft_alert_mutes (pattern text primary key, note text);
