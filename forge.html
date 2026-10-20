@@ -502,7 +502,8 @@ document.querySelectorAll('[role="tab"]').forEach(t => t.addEventListener('click
     board = (b && (b.data || (b[0] && b[0].data))) || null;
     if (!board || board.type !== 'forge') throw new Error('this link is not a FORGE board');
     document.title = 'FORGE ' + board.week;
-    document.getElementById('meta').innerHTML = `Live board · <b>week of ${esc(board.week)}</b><br>${board.ideas.length} ideas · Dillon approves ATP, CTF, PLT · David approves TL, GU, OTX<br>Published ${esc(String(board.published || '').replace('T', ' '))}`;
+    document.getElementById('meta').innerHTML = `Live board · <b>week of ${esc(board.week)}</b><br>${board.ideas.length} ideas · ${esc(board.lane_text || 'Dillon approves ATP, CTF, PLT · David approves TL, GU, OTX')}<br>Published ${esc(String(board.published || '').replace('T', ' '))}`;
+    if (board.lane_text) { const ln = document.querySelector('.lane'); if (ln) ln.innerHTML = `<h3>Who approves</h3>${esc(board.lane_text)} Nothing builds until the approver says yes. Verdicts and notes go back to the Idea Library every hour.`; }
     notes = (await SB.rpc('get_notes', { p_token:TOKEN }) || []).map(r => ({ id:r.id, kind:r.kind, asset_id:r.asset_id, author:r.author, body:r.body, state:r.state, x:r.x, y:r.y, img:r.img, link:r.link }));
     render();
     if (!viewer) setTimeout(askName, 500);
