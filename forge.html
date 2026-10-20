@@ -447,7 +447,7 @@ function winnerCard(i){
 }
 const oscNotes = id => notes.filter(n => n.kind === 'osc' && n.asset_id === id && n.body);
 function oscText(i){ const o = oscNotes(i.id); return o.length ? o[o.length - 1].body : (i.mock && i.mock.lines ? i.mock.lines.map((l, k) => String.fromCharCode(65 + k) + ': ' + l).join('\n') : ''); }
-function oscOf(i){ return oscText(i).split(/\n/).map(l => l.replace(/^\s*[A-D]\s*:\s*/, '').trim()).filter(Boolean).slice(0, 4); }
+function oscOf(i){ return oscText(i).split(/\n/).filter(l => /^\s*[A-D]\s*:/.test(l)).map(l => l.replace(/^\s*[A-D]\s*:\s*/, '').trim()).filter(Boolean).slice(0, 4); }
 function oscBox(i){
   const o = oscNotes(i.id), last = o[o.length - 1];
   return `<div class="box osc"><h4>On-screen copy <small>${last ? 'edited by ' + esc(last.author) : (i.mock && i.mock.lines && i.mock.lines.length ? 'first pass by FORGE' : 'none yet')}</small></h4>
@@ -499,8 +499,9 @@ function bodyOf(i){
       ${oscBox(i)}
       <div class="box"><h4>Notes <small>${textNotes.length}</small></h4>${noteRows}${pend}${!noteRows && !pend ? '<span class="hint">Click the ad to pin a note, or write a general one.</span>' : ''}
         <div class="add"><textarea data-notebox="${esc(i.id)}" placeholder="${pending[i.id] ? 'Note for the new pin' : 'Write a note'}"></textarea><button data-addnote="${esc(i.id)}" type="button">${pending[i.id] ? 'Save pin note' : 'Add note'}</button></div></div>
-      <div class="box"><h4>Links <small>${1 + ns.filter(n => n.link).length}</small></h4>
-        <div class="item"><a href="${esc(i.url)}" target="_blank" rel="noopener">This idea in the Idea Library</a><span class="who">Added by FORGE</span></div>${userLinks}
+      <div class="box"><h4>Links <small>${1 + (/comment bank/i.test([i.data, i.why, i.how, i.title].join(' ')) ? 1 : 0) + ns.filter(n => n.link).length}</small></h4>
+        <div class="item"><a href="${esc(i.url)}" target="_blank" rel="noopener">This idea in the Idea Library</a><span class="who">Added by FORGE</span></div>
+        ${/comment bank/i.test([i.data, i.why, i.how, i.title].join(' ')) ? `<div class="item"><a href="https://app.notion.com/p/1d4be3b747244d93a5d68dd0000e445a" target="_blank" rel="noopener">Comment Bank (real comments from the brand's posts)</a><span class="who">Source of this idea · Added by FORGE</span></div>` : ''}${userLinks}
         <div class="add"><label class="small" for="lk-${esc(i.id)}">Paste a link</label><input type="url" id="lk-${esc(i.id)}" placeholder="https://"><input type="text" id="lkn-${esc(i.id)}" placeholder="Note on this link (optional)"><div class="err" id="lke-${esc(i.id)}" role="alert"></div><button data-addlink="${esc(i.id)}" type="button">Add link</button></div></div>
       <div class="box"><h4>Files <small>${ns.filter(n => n.img).length}</small></h4>${files || '<span class="hint">Reference images: a photo, a frame, a screenshot. Up to 300 KB each.</span>'}
         <label class="filebtn">Upload image<input type="file" accept="image/*" data-addfile="${esc(i.id)}"></label><div class="err" id="fe-${esc(i.id)}" role="alert"></div></div>
