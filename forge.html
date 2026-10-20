@@ -528,7 +528,7 @@ function render(){
       const d = document.createElement('details'); d.className = 'idea-acc'; d.dataset.id = i.id; if (open.has(i.id)) d.open = true;
       d.innerHTML = `<summary><span class="chev" aria-hidden="true">›</span><div class="sum-main"><b>${i.n ? esc(i.n) + '. ' : ''}${esc(i.title)}</b><div class="sum-meta">
           <span class="state ${ST[cur][1]}">${cur === 'wait' ? 'Waiting on ' + esc(appr) : ST[cur][0]}</span>
-          <span class="tag ${src[0]}">${esc(src[1])}</span><span class="tag t-h">${esc(i.type || '')}</span>${i.persona ? `<span class="tag t-d">${esc(i.persona)}</span>` : ''}${i.refresh_of ? '<span class="tag t-x">Refresh</span>' : ''}</div></div>
+          <span class="tag ${src[0]}">${esc(src[1])}</span><span class="tag t-h">${esc(i.type || '')}</span>${i.persona ? `<span class="tag t-d">${esc(i.persona)}</span>` : ''}${i.refresh_of ? '<span class="tag t-x">Refresh</span>' : ''}${i.rolled_from ? `<span class="tag t-c">Rolled over from ${esc(String(i.rolled_from).slice(0, 10))}</span>` : ''}</div></div>
         <div class="sum-right">${ideaNotes(i.id).length} notes<br>${verdicts(i.id).length} verdicts</div></summary><div class="acc-body">${open.has(i.id) ? bodyOf(i) : ''}</div>`;
       g.appendChild(d); });
     b.appendChild(g); });
