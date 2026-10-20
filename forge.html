@@ -404,17 +404,19 @@ function pickOf(i){                                            // the content sh
 function creative(i){
   const pins = ideaNotes(i.id).filter(n => n.x != null).map((n, k) => `<span class="pin" style="left:${n.x}%;top:${n.y}%">${k + 1}</span>`).join('');
   const p = pending[i.id] ? `<span class="pin" style="left:${pending[i.id].x}%;top:${pending[i.id].y}%;background:var(--steel)">+</span>` : '';
-  const pk = pickOf(i), fid = pk ? (pk.src ? 'direct' : (pk.catalog_id || driveId(pk.drive))) : '';
+  const isDrive = s => /^[\w-]{20,}$/.test(s || '');
+  const pk = pickOf(i), fid = pk ? (pk.src ? 'direct' : (isDrive(pk.catalog_id) ? pk.catalog_id : driveId(pk.drive))) : '';
   let media = '', osc = '';
+  const ext = pk && !fid && pk.drive ? (/dropbox\.com/.test(pk.drive) ? 'Dropbox' : 'the source') : '';
   if (pk && pk.src) { media = `<img src="${esc(pk.src)}" alt="${esc(pk.title || '')}" loading="lazy" onerror="mockErr(this)" style="object-fit:contain;background:#fff">`;
     osc = `<div class="osc"><span class="l1">${esc(i.title)}</span></div>`; }
   else if (fid && pk.kind === 'video') media = `<iframe src="${esc(VID(fid))}" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="${esc(pk.title || 'Video from the brand drive')}"></iframe>`;
   else if (fid) { media = `<img src="${esc(IMG(fid))}" data-alt="${esc(IMG2(fid))}" alt="${esc(pk.title || '')}" loading="lazy" onerror="mockErr(this)">`;
     osc = `<div class="osc"><span class="l1">${esc(i.title)}</span></div>`; }
-  const fallback = fid ? 'Content could not load. Sign in to Google with your dlmedia.org account, or open it in Drive.' : 'Mock ad · no catalogued content matched yet, pick one below';
+  const fallback = fid ? 'Content could not load. Sign in to Google with your dlmedia.org account, or open it in Drive.' : ext ? `${esc(pk.title)} · this file sits on ${ext}, which cannot show inside the card. Open it there.` : 'Mock ad · no catalogued content matched yet, pick one below';
   return `<div class="creative ${fid ? 'has-media' : ''}" data-id="${esc(i.id)}" title="${pk && pk.kind === 'video' ? 'Video plays here' : 'Click to drop a pin'}">${media}<div class="typecard"><div>
       <div class="q">${esc(i.title)}</div><span class="s">${esc(i.type || '')}${i.persona ? ' · ' + esc(i.persona) : ''}<br>${esc(fallback)}</span></div></div>${osc}${pins}${p}
-      ${fid ? `<a class="drivelink" href="${esc(pk.drive)}" target="_blank" rel="noopener">${pk.src ? 'Open product' : 'Open in Drive'} ↗</a>` : ''}</div>`;
+      ${fid ? `<a class="drivelink" href="${esc(pk.drive)}" target="_blank" rel="noopener">${pk.src ? 'Open product' : 'Open in Drive'} ↗</a>` : ext ? `<a class="drivelink" href="${esc(pk.drive)}" target="_blank" rel="noopener">Open in ${esc(ext)} ↗</a>` : ''}</div>`;
 }
 function contentBox(i, appr){
   const pk = pickOf(i), cands = candsOf(i), fid = pk ? (pk.catalog_id || driveId(pk.drive)) : '';
@@ -424,7 +426,7 @@ function contentBox(i, appr){
   const pickHtml = pk ? `<div class="item"><div class="row"><b>${esc(pk.title || 'Drive file')}</b></div>
       <div class="pickrow">${pk.rating ? `<span class="tag t-x">${esc(pk.rating)}</span>` : ''}<span class="tag t-h">${esc(pk.kind)}</span></div>
       ${pk.what ? `<div>${esc(pk.what)}</div>` : ''}
-      <div class="row"><a href="${esc(pk.drive)}" target="_blank" rel="noopener">${pk.src ? 'Open the product' : 'Open in Drive'}</a><span class="who">this link goes into the brief</span></div></div>`
+      <div class="row"><a href="${esc(pk.drive)}" target="_blank" rel="noopener">${pk.src ? 'Open the product' : /dropbox\.com/.test(pk.drive || '') ? 'Open in Dropbox' : 'Open in Drive'}</a><span class="who">this link goes into the brief</span></div></div>`
     : '<span class="hint">No catalogued content matched this idea yet. Pick a file below or paste a Drive link.</span>';
   const alts = cands.filter(c => c.catalog_id !== fid);
   const candHtml = alts.length ? `<div class="cands">${alts.map(c => `<button type="button" data-swap="${esc(i.id)}" data-fid="${esc(c.catalog_id)}">${esc(c.title)}<small>${esc(c.kind)}${c.rating ? ' · ' + esc(c.rating) : ''}${c.what ? ' · ' + esc(String(c.what).slice(0, 90)) : ''}</small></button>`).join('')}</div>` : '';
