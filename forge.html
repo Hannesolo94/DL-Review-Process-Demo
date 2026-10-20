@@ -189,6 +189,20 @@ details.idea-acc[open] .chev{transform:rotate(90deg)}
 .me a{color:var(--ember)}
 .variant{flex:0 0 300px;max-width:300px}
 .item div{overflow-wrap:anywhere}
+.creative iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:#000}
+.creative.has-media .typecard{display:none}
+.creative .osc .l1{text-wrap:balance}
+.creative .drivelink{position:absolute;right:8px;bottom:8px;font:500 11px var(--mono);background:rgba(0,0,0,.6);color:#fff;padding:3px 8px;border-radius:6px;text-decoration:none;pointer-events:auto}
+.content .pickrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.cands{display:flex;flex-direction:column;gap:6px}
+.cands button{text-align:left;font:400 12px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;cursor:pointer;overflow-wrap:anywhere}
+.cands button small{display:block;color:var(--muted);font-family:var(--mono);font-size:11px}
+.ckrow{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer}
+.ckrow input{width:18px;height:18px;accent-color:var(--ok)}
+.add select{font:400 13px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px}
+body.solo .rail,body.solo nav.tabs,body.solo .throw,body.solo .lane,body.solo .donebar,body.solo .bar .filters,body.solo .counts,body.solo #p-board>.hint,body.solo .sub{display:none}
+body.solo .idea-acc>summary{pointer-events:none}
+body.solo .brandgroup>h3 small{display:none}
 .decide .route .state{display:inline-block;margin:6px 4px 0 0}
 @media (max-width:520px){.throwrow{grid-template-columns:1fr}.variant{flex-basis:260px}}
 </style></head><body>
@@ -343,6 +357,13 @@ const SB = { url:'https://yobtgnpwbqcnvedzrmlh.supabase.co', key:'sb_publishable
       headers:{ apikey:this.key, Authorization:'Bearer ' + this.key, 'Content-Type':'application/json' }, body:JSON.stringify(body) });
     const t = await r.text(); if (!r.ok) throw new Error(t || ('HTTP ' + r.status)); return t ? JSON.parse(t) : null; } };
 const TOKEN = new URLSearchParams(location.search).get('b');
+const SOLO = new URLSearchParams(location.search).get('i') || '';        // Oct 20: one idea's mock on its own, linkable from the brief
+const driveId = u => { const m = /\/d\/([\w-]{20,})|[?&]id=([\w-]{20,})/.exec(u || ''); return m ? (m[1] || m[2]) : ''; };
+const IMG = id => 'https://lh3.googleusercontent.com/d/' + id + '=w900';
+const IMG2 = id => 'https://drive.google.com/thumbnail?id=' + id + '&sz=w900';
+const VID = id => 'https://drive.google.com/file/d/' + id + '/preview';
+window.mockErr = img => { if (img.dataset.alt) { img.src = img.dataset.alt; img.dataset.alt = ''; return; }
+  const c = img.closest('.creative'); if (c) { c.classList.remove('has-media'); c.classList.add('no-media'); } img.remove(); };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const whoKey = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24) || 'someone';
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -371,11 +392,44 @@ function stateOf(i){ const appr = i.approver || (board.approver || {})[i.brand] 
   const v = verdicts(i.id).find(x => whoKey(x.author) === whoKey(appr)) || null;
   if (!v) return 'wait'; return v.state === 'approved' ? 'ok' : v.state === 'killed' ? 'kill' : 'chg'; }
 
+const swapsOf = id => notes.filter(n => n.kind === 'mock' && n.asset_id === id && n.link);
+const candsOf = i => ((i.mock || {}).candidates || []);
+function pickOf(i){                                            // the content shown on the mock: the last swap wins, else the matcher's pick
+  const sw = swapsOf(i.id); const last = sw[sw.length - 1];
+  if (last) { const fid = driveId(last.link); const c = candsOf(i).find(x => x.catalog_id === fid);
+    if (c) return c; const [kind, , title] = String(last.body || '').split('|');
+    return { catalog_id:fid, kind:kind === 'video' ? 'video' : 'image', title:title || last.link, drive:last.link, what:'Pasted by ' + last.author, rating:'' }; }
+  return (i.mock || {}).pick || null;
+}
 function creative(i){
   const pins = ideaNotes(i.id).filter(n => n.x != null).map((n, k) => `<span class="pin" style="left:${n.x}%;top:${n.y}%">${k + 1}</span>`).join('');
   const p = pending[i.id] ? `<span class="pin" style="left:${pending[i.id].x}%;top:${pending[i.id].y}%;background:var(--steel)">+</span>` : '';
-  return `<div class="creative" data-id="${esc(i.id)}" title="Click to drop a pin"><div class="typecard"><div>
-      <div class="q">${esc(i.title)}</div><span class="s">${esc(i.type || '')}${i.persona ? ' · ' + esc(i.persona) : ''}<br>Mock ad · visuals come with the brief</span></div></div>${pins}${p}</div>`;
+  const pk = pickOf(i), fid = pk ? (pk.catalog_id || driveId(pk.drive)) : '';
+  let media = '', osc = '';
+  if (fid && pk.kind === 'video') media = `<iframe src="${esc(VID(fid))}" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="${esc(pk.title || 'Video from the brand drive')}"></iframe>`;
+  else if (fid) { media = `<img src="${esc(IMG(fid))}" data-alt="${esc(IMG2(fid))}" alt="${esc(pk.title || '')}" loading="lazy" onerror="mockErr(this)">`;
+    osc = `<div class="osc"><span class="l1">${esc(i.title)}</span></div>`; }
+  const fallback = fid ? 'Content could not load. Sign in to Google with your dlmedia.org account, or open it in Drive.' : 'Mock ad · no catalogued content matched yet, pick one below';
+  return `<div class="creative ${fid ? 'has-media' : ''}" data-id="${esc(i.id)}" title="${pk && pk.kind === 'video' ? 'Video plays here' : 'Click to drop a pin'}">${media}<div class="typecard"><div>
+      <div class="q">${esc(i.title)}</div><span class="s">${esc(i.type || '')}${i.persona ? ' · ' + esc(i.persona) : ''}<br>${esc(fallback)}</span></div></div>${osc}${pins}${p}
+      ${fid ? `<a class="drivelink" href="${esc(pk.drive)}" target="_blank" rel="noopener">Open in Drive ↗</a>` : ''}</div>`;
+}
+function contentBox(i, appr){
+  const pk = pickOf(i), cands = candsOf(i), fid = pk ? (pk.catalog_id || driveId(pk.drive)) : '';
+  const oks = notes.filter(n => n.kind === 'content' && n.asset_id === i.id && n.state === 'approved');
+  const mineOk = oks.some(n => whoKey(n.author) === whoKey(viewer));
+  const chips = oks.map(n => `<span class="state s-ok">✓ ${esc(n.author)}</span>`).join(' ');
+  const pickHtml = pk ? `<div class="item"><div class="row"><b>${esc(pk.title || 'Drive file')}</b></div>
+      <div class="pickrow">${pk.rating ? `<span class="tag t-x">${esc(pk.rating)}</span>` : ''}<span class="tag t-h">${esc(pk.kind)}</span></div>
+      ${pk.what ? `<div>${esc(pk.what)}</div>` : ''}
+      <div class="row"><a href="${esc(pk.drive)}" target="_blank" rel="noopener">Open in Drive</a><span class="who">this link goes into the brief</span></div></div>`
+    : '<span class="hint">No catalogued content matched this idea yet. Pick a file below or paste a Drive link.</span>';
+  const alts = cands.filter(c => c.catalog_id !== fid);
+  const candHtml = alts.length ? `<div class="cands">${alts.map(c => `<button type="button" data-swap="${esc(i.id)}" data-fid="${esc(c.catalog_id)}">${esc(c.title)}<small>${esc(c.kind)}${c.rating ? ' · ' + esc(c.rating) : ''}${c.what ? ' · ' + esc(String(c.what).slice(0, 90)) : ''}</small></button>`).join('')}</div>` : '';
+  return `<div class="box content"><h4>Content <small>from the brand drive</small></h4>${pickHtml}
+      ${alts.length ? `<span class="hint">Swap to another match:</span>${candHtml}` : ''}
+      <div class="add"><label class="small" for="pm-${esc(i.id)}">Or paste a Drive link</label><input type="url" id="pm-${esc(i.id)}" placeholder="https://drive.google.com/file/d/..."><select id="pmk-${esc(i.id)}" aria-label="Image or video"><option value="image">Image</option><option value="video">Video</option></select><div class="err" id="pme-${esc(i.id)}" role="alert"></div><button data-pastemock="${esc(i.id)}" type="button">Use this file</button></div>
+      <label class="ckrow"><input type="checkbox" data-cok="${esc(i.id)}" ${mineOk ? 'checked' : ''} ${pk ? '' : 'disabled'}> Content approved${appr ? ` <span class="who">(${esc(appr)} decides)</span>` : ''}</label>${chips ? `<div>${chips}</div>` : ''}</div>`;
 }
 function bodyOf(i){
   const appr = i.approver || (board.approver || {})[i.brand] || '';
@@ -401,6 +455,7 @@ function bodyOf(i){
       <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(NAMES[i.brand] || i.brand)}</b><small>Sponsored · mock ad</small></div></div>
       ${creative(i)}</div></div>
     <div class="cols">
+      ${contentBox(i, appr)}
       <div class="box"><h4>Notes <small>${textNotes.length}</small></h4>${noteRows}${pend}${!noteRows && !pend ? '<span class="hint">Click the ad to pin a note, or write a general one.</span>' : ''}
         <div class="add"><textarea data-notebox="${esc(i.id)}" placeholder="${pending[i.id] ? 'Note for the new pin' : 'Write a note'}"></textarea><button data-addnote="${esc(i.id)}" type="button">${pending[i.id] ? 'Save pin note' : 'Add note'}</button></div></div>
       <div class="box"><h4>Links <small>${1 + ns.filter(n => n.link).length}</small></h4>
@@ -419,7 +474,8 @@ function bodyOf(i){
 
 function render(){
   if (!board) return;
-  const list = ideas(), brands = ORDER.filter(b => list.some(i => i.brand === b));
+  const list = SOLO ? ideas().filter(i => i.id === SOLO) : ideas(), brands = ORDER.filter(b => list.some(i => i.brand === b));
+  if (SOLO) list.forEach(i => open.add(i.id));
   document.getElementById('filters').innerHTML = ['all', ...brands].map(b => `<button class="chip" data-f="${b}" aria-pressed="${filt === b}">${b === 'all' ? 'All' : b} ${b === 'all' ? list.length : list.filter(i => i.brand === b).length}</button>`).join('');
   const tally = { ok:0, wait:0, kill:0, chg:0 }; list.forEach(i => tally[stateOf(i)]++);
   document.getElementById('counts').innerHTML = `<span>${list.length} ideas</span><span>${tally.ok} approved</span><span>${tally.wait} waiting</span><span>${tally.chg} changes</span><span>${tally.kill} killed</span>`;
@@ -472,8 +528,32 @@ B.addEventListener('click', async e => {
     notes.push({ id, kind:'note', asset_id:iid, author:viewer, body, link:u }); render();
     await save({ id, kind:'note', assetId:iid, author:viewer, text:body, link:u, round:1 }); return; }
   const dl = e.target.closest('button[data-del]');
-  if (dl) { const id = dl.dataset.del; notes = notes.filter(n => n.id !== id); render(); await drop(id); }
+  if (dl) { const id = dl.dataset.del; notes = notes.filter(n => n.id !== id); render(); await drop(id); return; }
+  const sw = e.target.closest('button[data-swap]');
+  if (sw) { if (!viewer && !askName()) return; const iid = sw.dataset.swap, i = ideas().find(x => x.id === iid), c = candsOf(i).find(x => x.catalog_id === sw.dataset.fid); if (!c) return;
+    const id = uid('fm_'), body = `${c.kind}|${c.catalog_id}|${c.title}`;
+    const olds = notes.filter(n => n.kind === 'content' && n.asset_id === iid);          // new content, approvals start over
+    notes = notes.filter(n => !(n.kind === 'content' && n.asset_id === iid));
+    notes.push({ id, kind:'mock', asset_id:iid, author:viewer, body, link:c.drive }); render();
+    await save({ id, kind:'mock', assetId:iid, author:viewer, text:body, link:c.drive, round:1 });
+    for (const n of olds) await drop(n.id); return; }
+  const pm = e.target.closest('button[data-pastemock]');
+  if (pm) { if (!viewer && !askName()) return; const iid = pm.dataset.pastemock, u = document.getElementById('pm-' + iid).value.trim(), er = document.getElementById('pme-' + iid);
+    const fid = driveId(u); if (!fid) { er.textContent = 'Paste a Google Drive file link (drive.google.com/file/d/...).'; return; }
+    const kind = document.getElementById('pmk-' + iid).value, id = uid('fm_'), body = `${kind}|${fid}|Pasted link`;
+    const olds = notes.filter(n => n.kind === 'content' && n.asset_id === iid);
+    notes = notes.filter(n => !(n.kind === 'content' && n.asset_id === iid));
+    notes.push({ id, kind:'mock', asset_id:iid, author:viewer, body, link:u }); render();
+    await save({ id, kind:'mock', assetId:iid, author:viewer, text:body, link:u, round:1 });
+    for (const n of olds) await drop(n.id); return; }
 });
+B.addEventListener('change', async e => { const ck = e.target.closest('input[data-cok]'); if (!ck) return;
+  if (!viewer && !askName()) { ck.checked = !ck.checked; return; }
+  const iid = ck.dataset.cok, id = 'fc_' + iid + '_' + whoKey(viewer);
+  notes = notes.filter(n => n.id !== id);
+  if (ck.checked) { notes.push({ id, kind:'content', asset_id:iid, author:viewer, state:'approved' }); render();
+    await save({ id, kind:'content', assetId:iid, author:viewer, state:'approved', text:'', round:1 }); }
+  else { render(); await drop(id); } });
 B.addEventListener('change', e => { const f = e.target.closest('input[data-addfile]'); if (!f || !f.files[0]) return;
   const iid = f.dataset.addfile, file = f.files[0], er = document.getElementById('fe-' + iid);
   if (!viewer && !askName()) return;
@@ -501,7 +581,10 @@ document.querySelectorAll('[role="tab"]').forEach(t => t.addEventListener('click
     const b = await SB.rpc('get_brief', { p_token:TOKEN });
     board = (b && (b.data || (b[0] && b[0].data))) || null;
     if (!board || board.type !== 'forge') throw new Error('this link is not a FORGE board');
-    document.title = 'FORGE ' + board.week;
+    const laneName = board.lane === 'client' ? 'Client brands' : board.lane === 'partner' ? 'Partner brands' : '';
+    document.title = 'FORGE ' + board.week + (laneName ? ' · ' + laneName : '');
+    if (SOLO) { const si = (board.ideas || []).find(i => i.id === SOLO); document.body.classList.add('solo');
+      if (si) document.title = 'FORGE mock · ' + si.brand + ' · ' + si.title; }
     document.getElementById('meta').innerHTML = `Live board · <b>week of ${esc(board.week)}</b><br>${board.ideas.length} ideas · ${esc(board.lane_text || 'Dillon approves ATP, CTF, PLT · David approves TL, GU, OTX')}<br>Published ${esc(String(board.published || '').replace('T', ' '))}`;
     if (board.lane_text) { const ln = document.querySelector('.lane'); if (ln) ln.innerHTML = `<h3>Who approves</h3>${esc(board.lane_text)} Nothing builds until the approver says yes. Verdicts and notes go back to the Idea Library every hour.`; }
     notes = (await SB.rpc('get_notes', { p_token:TOKEN }) || []).map(r => ({ id:r.id, kind:r.kind, asset_id:r.asset_id, author:r.author, body:r.body, state:r.state, x:r.x, y:r.y, img:r.img, link:r.link }));
