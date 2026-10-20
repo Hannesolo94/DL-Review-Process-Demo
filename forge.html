@@ -189,6 +189,7 @@ details.idea-acc[open] .chev{transform:rotate(90deg)}
 .me a{color:var(--ember)}
 .variant{flex:0 0 300px;max-width:300px}
 .item div{overflow-wrap:anywhere}
+.box.osc textarea{width:100%;font:400 13px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-height:84px}
 .creative .osc{pointer-events:none;z-index:2}
 .creative .osc.onvideo{top:auto;bottom:14%;text-shadow:0 2px 12px rgba(0,0,0,.8)}
 .creative .osc .opts{display:block;margin-top:8px;font:500 11px var(--mono);text-transform:none;letter-spacing:0;color:#fff}
@@ -417,7 +418,7 @@ function creative(i){
   const isDrive = s => /^[\w-]{20,}$/.test(s || '');
   const pk = pickOf(i), fid = pk ? (pk.src ? 'direct' : (isDrive(pk.catalog_id) ? pk.catalog_id : driveId(pk.drive))) : '';
   let media = '', osc = '';
-  const lines = (i.mock && i.mock.lines && i.mock.lines.length) ? `<span class="opts">${i.mock.lines.map((l, k) => `<span>${String.fromCharCode(65 + k)}: ${esc(l)}</span>`).join('')}</span>` : '';
+  const L = oscOf(i); const lines = L.length ? `<span class="opts">${L.map((l, k) => `<span>${String.fromCharCode(65 + k)}: ${esc(l)}</span>`).join('')}</span>` : '';
   const ext = pk && !fid && pk.drive ? (/dropbox\.com/.test(pk.drive) ? 'Dropbox' : 'the source') : '';
   if (pk && pk.src) { media = `<img src="${esc(pk.src)}" alt="${esc(pk.title || '')}" loading="lazy" onerror="mockErr(this)" style="object-fit:contain;background:#fff">`;
     osc = `<div class="osc"><span class="l1">${esc(i.title)}</span>${lines}</div>`; }
@@ -441,6 +442,15 @@ function winnerCard(i){
       <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(w.ad || w.brief || 'The winner')}</b><small>Live ad, as it runs on Facebook${w.spend ? ' · $' + esc(w.spend) + ' spent' : ''}</small></div></div>
       <div class="creative has-media" title="The winner"><iframe src="${esc(src)}" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="${esc(w.ad || 'winner')}"></iframe>
         <a class="drivelink" href="${esc(w.notion || href)}" target="_blank" rel="noopener">${w.notion ? 'Open the brief' : 'Open on Facebook'} ↗</a></div></div>`;
+}
+const oscNotes = id => notes.filter(n => n.kind === 'osc' && n.asset_id === id && n.body);
+function oscText(i){ const o = oscNotes(i.id); return o.length ? o[o.length - 1].body : (i.mock && i.mock.lines ? i.mock.lines.map((l, k) => String.fromCharCode(65 + k) + ': ' + l).join('\n') : ''); }
+function oscOf(i){ return oscText(i).split(/\n/).map(l => l.replace(/^\s*[A-D]\s*:\s*/, '').trim()).filter(Boolean).slice(0, 4); }
+function oscBox(i){
+  const o = oscNotes(i.id), last = o[o.length - 1];
+  return `<div class="box osc"><h4>On-screen copy <small>${last ? 'edited by ' + esc(last.author) : (i.mock && i.mock.lines && i.mock.lines.length ? 'first pass by FORGE' : 'none yet')}</small></h4>
+      <span class="hint">One line per option, A first. It shows on the mock and goes back to the Idea Library within the hour.</span>
+      <div class="add"><textarea data-oscbox="${esc(i.id)}" rows="4" placeholder="A: the line\nB: the other line">${esc(oscText(i))}</textarea><button data-saveosc="${esc(i.id)}" type="button">Save copy</button></div></div>`;
 }
 function contentBox(i, appr){
   const pk = pickOf(i), cands = candsOf(i), fid = pk ? (pk.catalog_id || driveId(pk.drive)) : '';
@@ -484,6 +494,7 @@ function bodyOf(i){
       ${creative(i)}</div>${winnerCard(i)}</div>
     <div class="cols">
       ${contentBox(i, appr)}
+      ${oscBox(i)}
       <div class="box"><h4>Notes <small>${textNotes.length}</small></h4>${noteRows}${pend}${!noteRows && !pend ? '<span class="hint">Click the ad to pin a note, or write a general one.</span>' : ''}
         <div class="add"><textarea data-notebox="${esc(i.id)}" placeholder="${pending[i.id] ? 'Note for the new pin' : 'Write a note'}"></textarea><button data-addnote="${esc(i.id)}" type="button">${pending[i.id] ? 'Save pin note' : 'Add note'}</button></div></div>
       <div class="box"><h4>Links <small>${1 + ns.filter(n => n.link).length}</small></h4>
@@ -565,6 +576,11 @@ B.addEventListener('click', async e => {
     notes.push({ id, kind:'mock', asset_id:iid, author:viewer, body, link:c.drive }); render();
     await save({ id, kind:'mock', assetId:iid, author:viewer, text:body, link:c.drive, round:1 });
     for (const n of olds) await drop(n.id); return; }
+  const so = e.target.closest('button[data-saveosc]');
+  if (so) { if (!viewer && !askName()) return; const iid = so.dataset.saveosc, ta = document.querySelector(`textarea[data-oscbox="${iid}"]`), body = (ta.value || '').trim();
+    const id = 'fo_' + iid + '_' + whoKey(viewer);
+    notes = notes.filter(n => n.id !== id); notes.push({ id, kind:'osc', asset_id:iid, author:viewer, body }); render();
+    await save({ id, kind:'osc', assetId:iid, author:viewer, text:body, round:1 }); return; }
   const pm = e.target.closest('button[data-pastemock]');
   if (pm) { if (!viewer && !askName()) return; const iid = pm.dataset.pastemock, u = document.getElementById('pm-' + iid).value.trim(), er = document.getElementById('pme-' + iid);
     const fid = driveId(u); if (!fid) { er.textContent = 'Paste a Google Drive file link (drive.google.com/file/d/...).'; return; }
