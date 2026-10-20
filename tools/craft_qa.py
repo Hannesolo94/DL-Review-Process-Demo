@@ -117,6 +117,7 @@ def main(slugs):
     with psycopg.connect(dsn) as c:
         rows = c.execute("select slug, creator_token from public.briefs order by slug").fetchall()
     rows = [r for r in rows if not slugs or r[0] in slugs]
+    rows = [r for r in rows if not str(r[0]).startswith("FORGE-")]   # Oct 19: FORGE idea boards share the table but hold no ads
     bad = 0
     for slug, token in rows:
         p = qa(slug, token)
