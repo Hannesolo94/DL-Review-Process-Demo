@@ -189,6 +189,8 @@ details.idea-acc[open] .chev{transform:rotate(90deg)}
 .me a{color:var(--ember)}
 .variant{flex:0 0 300px;max-width:300px}
 .item div{overflow-wrap:anywhere}
+/* Oct 20 (Hannes): live boards are the real idea pages, not the demo: no demo tabs, no stage rail, no explainer panels */
+nav.tabs,.rail,#p-flow,#p-fri,#p-wed{display:none!important}
 .box.osc textarea{width:100%;font:400 13px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-height:84px}
 .creative .osc{pointer-events:none;z-index:2}
 .creative .osc.onvideo{top:auto;bottom:14%;text-shadow:0 2px 12px rgba(0,0,0,.8)}
@@ -552,8 +554,14 @@ B.addEventListener('click', async e => {
   if (vb) { if (!viewer && !askName()) return; const iid = vb.dataset.id, v = vb.dataset.v, id = 'fv_' + iid + '_' + whoKey(viewer);
     const cur = notes.find(n => n.id === id); notes = notes.filter(n => n.id !== id);
     if (cur && cur.state === v) { render(); await drop(id); return; }
-    notes.push({ id, kind:'verdict', asset_id:iid, author:viewer, state:v }); render();
-    await save({ id, kind:'verdict', assetId:iid, author:viewer, state:v, text:'', round:1 }); return; }
+    let why = '';
+    if (v === 'killed') { why = (prompt('Why kill it? One line, so the idea engine knows not to pitch it again.') || '').trim();
+      if (!why) { notes.push(cur || []); notes = notes.filter(n => n && n.id); render(); status('Kill needs a reason, nothing saved.'); return; } }
+    notes.push({ id, kind:'verdict', asset_id:iid, author:viewer, state:v, body:why }); render();
+    await save({ id, kind:'verdict', assetId:iid, author:viewer, state:v, text:why, round:1 });
+    if (why) { const nid = uid('fn_'), body = 'Kill reason: ' + why; notes.push({ id:nid, kind:'note', asset_id:iid, author:viewer, body }); render();
+      await save({ id:nid, kind:'note', assetId:iid, author:viewer, text:body, round:1 }); }
+    return; }
   const an = e.target.closest('button[data-addnote]');
   if (an) { if (!viewer && !askName()) return; const iid = an.dataset.addnote, ta = document.querySelector(`textarea[data-notebox="${iid}"]`);
     const body = (ta.value || '').trim(); if (!body) { ta.focus(); return; }
