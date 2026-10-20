@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FORGE</title>
+<!-- Oct 19 2026: live FORGE board. One board per week (Supabase briefs row FORGE-<week>), fed from the Notion Idea Library by
+     D:/IdeaMachine/forge_sync.py. Verdicts, notes and thrown-in ideas are shared rows (same token security as CRAFT),
+     never browser-only. Approver: Dillon for client brands, David for partner brands. -->
+<style>
+  :root { --bg:#0e1111; --card:#171c1c; --line:#2a3333; --ink:#e8efe9; --dim:#9aa7a2; --acc:#c9a14a; --ok:#58c27d; --warn:#e2b04a; --bad:#e06a5a; --chip:#222a2a; }
+  @media (prefers-color-scheme: light) { :root { --bg:#f4f1ea; --card:#ffffff; --line:#ddd6c8; --ink:#1d2321; --dim:#5f6a66; --acc:#9a7424; --chip:#efe9dc; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:var(--bg); border-bottom:1px solid var(--line); padding:12px 16px 8px; }
+  h1 { margin:0; font-size:20px; letter-spacing:.12em; } h1 span { color:var(--acc); }
+  .sub { color:var(--dim); font-size:13px; margin-top:2px; }
+  .bar { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+  .tab { border:1px solid var(--line); background:var(--chip); color:var(--ink); padding:4px 10px; border-radius:999px; cursor:pointer; font-size:13px; }
+  .tab.on { border-color:var(--acc); color:var(--acc); }
+  .tab .c { color:var(--dim); margin-left:4px; }
+  .me { margin-left:auto; font-size:13px; color:var(--dim); cursor:pointer; }
+  main { max-width:900px; margin:0 auto; padding:14px 16px 80px; }
+  .focus { border-left:3px solid var(--acc); padding:6px 10px; margin:6px 0 14px; color:var(--dim); font-size:14px; background:var(--card); border-radius:6px; }
+  .focus b { color:var(--ink); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:12px; }
+  .top { display:flex; gap:8px; align-items:flex-start; }
+  .num { color:var(--acc); font-weight:700; min-width:22px; }
+  .ttl { font-weight:650; font-size:16px; flex:1; }
+  .chips { display:flex; gap:5px; flex-wrap:wrap; margin:6px 0 4px; }
+  .chip { background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:1px 8px; font-size:12px; color:var(--dim); }
+  .chip.src { color:var(--acc); border-color:var(--acc); }
+  .fit { font-size:13px; color:var(--dim); margin:2px 0 6px; }
+  details { margin-top:4px; } summary { cursor:pointer; color:var(--dim); font-size:13px; }
+  .fld { margin:6px 0; } .fld b { display:block; font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; }
+  .acts { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+  .btn { border:1px solid var(--line); background:var(--chip); color:var(--ink); border-radius:7px; padding:5px 11px; cursor:pointer; font-size:14px; }
+  .btn.ok.on { background:var(--ok); color:#0e1111; border-color:var(--ok); }
+  .btn.ch.on { background:var(--warn); color:#0e1111; border-color:var(--warn); }
+  .btn.kl.on { background:var(--bad); color:#0e1111; border-color:var(--bad); }
+  .who { font-size:12px; color:var(--dim); }
+  .who .v { margin-right:6px; } .v.approved { color:var(--ok); } .v.changes { color:var(--warn); } .v.killed { color:var(--bad); }
+  .notes { margin-top:8px; border-top:1px dashed var(--line); padding-top:6px; }
+  .note { font-size:14px; margin:3px 0; } .note b { color:var(--acc); font-weight:600; }
+  textarea { width:100%; min-height:54px; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:6px 8px; font:inherit; resize:vertical; }
+  .row { display:flex; gap:6px; margin-top:6px; } .row textarea { flex:1; }
+  .appr { font-size:12px; color:var(--dim); margin-left:auto; }
+  .throw { background:var(--card); border:1px dashed var(--acc); border-radius:10px; padding:12px 14px; margin:4px 0 22px; }
+  .throw h3 { margin:0 0 6px; font-size:14px; color:var(--acc); }
+  .msg { color:var(--dim); padding:30px 0; text-align:center; }
+  .done { position:fixed; bottom:14px; right:16px; } .done .btn { background:var(--acc); color:#0e1111; border-color:var(--acc); font-weight:650; }
+  .status { position:fixed; bottom:14px; left:16px; font-size:12px; color:var(--dim); }
+  a { color:var(--acc); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>FORGE</span> IDEAS</h1>
+  <div class="sub" id="sub">Loading the board...</div>
+  <div class="bar" id="tabs"></div>
+</header>
+<main id="main"><div class="msg">Loading...</div></main>
+<div class="done"><button class="btn" id="doneBtn">I'm done reviewing</button></div>
+<div class="status" id="status"></div>
+<script>
+const SB = { url:'https://yobtgnpwbqcnvedzrmlh.supabase.co', key:'sb_publishable_aHRdYPgnKxgvM3QSVUqs3Q_8mCqQ3KM',
+  async rpc(fn, body){ const r = await fetch(this.url + '/rest/v1/rpc/' + fn, { method:'POST',
+      headers:{ apikey:this.key, Authorization:'Bearer ' + this.key, 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+    const t = await r.text(); if (!r.ok) throw new Error(t || ('HTTP ' + r.status)); return t ? JSON.parse(t) : null; } };
+const TOKEN = new URLSearchParams(location.search).get('b');
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const whoKey = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24) || 'someone';
+let board = null, notes = [], tab = 'ALL', viewer = '';
+try { viewer = localStorage.getItem('forgeName') || ''; } catch (e) {}
+const NAMES = { TL:'Threat Llama', GU:'Goons Up', OTX:'On The X', ATP:'American Trigger Pullers', CTF:'Carry The Fire', PLT:'PLTDaddy' };
+function setStatus(t){ document.getElementById('status').textContent = t; }
+function askName(){
+  const n = prompt("Who's reviewing? (your first name)", viewer || '');
+  if (n && n.trim()) { viewer = n.trim(); try { localStorage.setItem('forgeName', viewer); } catch (e) {} draw(); }
+  return !!viewer;
+}
+async function save(rec){ if (!TOKEN) return; try { await SB.rpc('put_note', { p_token:TOKEN, p:rec }); setStatus('Saved'); }
+  catch (e) { setStatus('Did not save: ' + e.message); } }
+async function drop(id){ if (!TOKEN) return; try { await SB.rpc('del_note', { p_token:TOKEN, p_id:id }); } catch (e) { setStatus('Did not save: ' + e.message); } }
+function verdictsFor(id){ return notes.filter(n => n.kind === 'verdict' && n.asset_id === id); }
+function draw(){
+  const ideas = (board.ideas || []);
+  const brands = [...new Set(ideas.map(i => i.brand))];
+  const tabs = ['ALL', ...brands].map(b => {
+    const c = b === 'ALL' ? ideas.length : ideas.filter(i => i.brand === b).length;
+    return `<span class="tab ${tab === b ? 'on' : ''}" data-t="${b}">${b === 'ALL' ? 'All' : b}<span class="c">${c}</span></span>`; }).join('');
+  document.getElementById('tabs').innerHTML = tabs + `<span class="me" id="me">${viewer ? 'Reviewing as ' + esc(viewer) : 'Set your name'}</span>`;
+  const show = tab === 'ALL' ? brands : [tab];
+  let html = '';
+  for (const b of show) {
+    const list = ideas.filter(i => i.brand === b);
+    const appr = (board.approver || {})[b] || '';
+    html += `<h2 style="margin:18px 0 4px;font-size:17px">${esc(NAMES[b] || b)} <span class="who">approver: ${esc(appr)}</span></h2>`;
+    if ((board.focus || {})[b]) html += `<div class="focus"><b>Focus:</b> ${esc(board.focus[b])}</div>`;
+    for (const i of list) {
+      const vs = verdictsFor(i.id), mine = vs.find(v => whoKey(v.author) === whoKey(viewer));
+      const ns = notes.filter(n => n.kind === 'note' && n.asset_id === i.id);
+      html += `<div class="card" data-id="${esc(i.id)}">
+        <div class="top"><span class="num">${esc(i.n || '')}</span><span class="ttl">${esc(i.title)}</span></div>
+        <div class="chips"><span class="chip">${esc(i.type)}</span>${i.persona ? `<span class="chip">Persona: ${esc(i.persona)}</span>` : ''}<span class="chip src">${esc(i.source || 'Machine')}</span>${i.refresh_of ? '<span class="chip">Refresh</span>' : ''}</div>
+        ${i.focus_fit ? `<div class="fit">${esc(i.focus_fit)}</div>` : ''}
+        <details><summary>Data, why, how, hypothesis</summary>
+          ${i.what_changed ? `<div class="fld"><b>What changed</b>${esc(i.what_changed)}</div>` : ''}
+          <div class="fld"><b>Data</b>${esc(i.data)}</div><div class="fld"><b>Why</b>${esc(i.why)}</div>
+          <div class="fld"><b>How</b>${esc(i.how)}</div><div class="fld"><b>Hypothesis</b>${esc(i.hypothesis)}</div>
+          <div class="fld"><a href="${esc(i.url)}" target="_blank" rel="noopener">Open in the Idea Library</a></div></details>
+        <div class="acts">
+          <button class="btn ok ${mine && mine.state === 'approved' ? 'on' : ''}" data-v="approved">Approve</button>
+          <button class="btn ch ${mine && mine.state === 'changes' ? 'on' : ''}" data-v="changes">Changes</button>
+          <button class="btn kl ${mine && mine.state === 'killed' ? 'on' : ''}" data-v="killed">Kill</button>
+          <span class="who">${vs.map(v => `<span class="v ${esc(v.state)}">${v.state === 'approved' ? '✓' : v.state === 'killed' ? '✗' : '~'} ${esc(v.author)}</span>`).join('')}</span>
+        </div>
+        <div class="notes">${ns.map(n => `<div class="note"><b>${esc(n.author)}:</b> ${esc(n.body)}</div>`).join('')}
+          <div class="row"><textarea placeholder="A note on this idea"></textarea><button class="btn" data-note="1">Add</button></div></div>
+      </div>`;
+    }
+    const thrown = notes.filter(n => n.kind === 'note' && n.asset_id === 'general:' + b);
+    html += `<div class="throw" data-brand="${esc(b)}"><h3>Throw in an idea for ${esc(b)}</h3>
+      ${thrown.map(n => `<div class="note"><b>${esc(n.author)}:</b> ${esc(n.body)}</div>`).join('')}
+      <div class="row"><textarea placeholder="Your idea, in your words. It goes into the Idea Library tagged with your name."></textarea><button class="btn" data-throw="1">Add</button></div></div>`;
+  }
+  document.getElementById('main').innerHTML = html || '<div class="msg">No ideas on this board yet.</div>';
+}
+document.addEventListener('click', async (e) => {
+  const t = e.target.closest('.tab'); if (t) { tab = t.dataset.t; draw(); return; }
+  if (e.target.id === 'me') { askName(); return; }
+  if (e.target.id === 'doneBtn') {
+    if (!viewer && !askName()) return;
+    const id = 'fd_' + board.week + '_' + whoKey(viewer);
+    const rec = { id, kind:'done', assetId:'board', author:viewer, text:'', round:1 };
+    notes = notes.filter(n => n.id !== id).concat([{ id, kind:'done', asset_id:'board', author:viewer }]);
+    await save(rec); setStatus('Marked done. Thanks, ' + viewer + '.'); return;
+  }
+  const card = e.target.closest('.card'), thr = e.target.closest('.throw');
+  const v = e.target.dataset.v;
+  if (card && v) {
+    if (!viewer && !askName()) return;
+    const id = 'fv_' + card.dataset.id + '_' + whoKey(viewer);
+    const cur = notes.find(n => n.id === id);
+    notes = notes.filter(n => n.id !== id);
+    if (cur && cur.state === v) { draw(); await drop(id); return; }       // pressing the same one again clears it
+    notes.push({ id, kind:'verdict', asset_id:card.dataset.id, author:viewer, state:v });
+    draw(); await save({ id, kind:'verdict', assetId:card.dataset.id, author:viewer, state:v, text:'', round:1 }); return;
+  }
+  if ((card && e.target.dataset.note) || (thr && e.target.dataset.throw)) {
+    if (!viewer && !askName()) return;
+    const box = (card || thr).querySelector('textarea'); const body = box.value.trim(); if (!body) return;
+    const asset = card ? card.dataset.id : 'general:' + thr.dataset.brand;
+    const id = 'fn_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    notes.push({ id, kind:'note', asset_id:asset, author:viewer, body }); box.value = ''; draw();
+    await save({ id, kind:'note', assetId:asset, author:viewer, text:body, round:1 });
+  }
+});
+(async () => {
+  if (!TOKEN) { document.getElementById('main').innerHTML = '<div class="msg">This board needs its link (the ?b= token).</div>'; return; }
+  try {
+    const b = await SB.rpc('get_brief', { p_token:TOKEN });
+    board = (b && (b.data || (b[0] && b[0].data))) || null;
+    if (!board || board.type !== 'forge') throw new Error('not a FORGE board');
+    document.getElementById('sub').textContent = `Week of ${board.week} · ${board.ideas.length} ideas · partner brands go to David, client brands to Dillon`;
+    document.title = 'FORGE ' + board.week;
+    notes = (await SB.rpc('get_notes', { p_token:TOKEN }) || []).map(r => ({ id:r.id, kind:r.kind, asset_id:r.asset_id, author:r.author, body:r.body, state:r.state }));
+    draw();
+    if (!viewer) setTimeout(askName, 400);
+  } catch (e) { document.getElementById('main').innerHTML = `<div class="msg">Could not load this board. ${esc(e.message)}</div>`; }
+})();
+</script>
+</body>
+</html>
