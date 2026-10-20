@@ -189,6 +189,12 @@ details.idea-acc[open] .chev{transform:rotate(90deg)}
 .me a{color:var(--ember)}
 .variant{flex:0 0 300px;max-width:300px}
 .item div{overflow-wrap:anywhere}
+.creative .bubbles{position:absolute;left:10px;right:10px;bottom:12px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.creative .bubble{align-self:flex-start;max-width:92%;background:rgba(255,255,255,.94);color:#16191c;border-radius:14px;padding:6px 10px;font:500 12px var(--body);line-height:1.3;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.creative .bubble b{display:block;font-size:11px;color:#5d656d;margin-bottom:1px}
+.winner .creative iframe{background:#fff}
+.vlab em.win{color:var(--ember)}
+.creative .cnote{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;background:rgba(0,0,0,.65);color:#fff;font:400 12px var(--body)}
 .creative iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:#000}
 .creative.has-media .typecard{display:none}
 .creative .osc .l1{text-wrap:balance}
@@ -416,7 +422,19 @@ function creative(i){
   const fallback = fid ? 'Content could not load. Sign in to Google with your dlmedia.org account, or open it in Drive.' : ext ? `${esc(pk.title)} · this file sits on ${ext}, which cannot show inside the card. Open it there.` : 'Mock ad · no catalogued content matched yet, pick one below';
   return `<div class="creative ${fid ? 'has-media' : ''}" data-id="${esc(i.id)}" title="${pk && pk.kind === 'video' ? 'Video plays here' : 'Click to drop a pin'}">${media}<div class="typecard"><div>
       <div class="q">${esc(i.title)}</div><span class="s">${esc(i.type || '')}${i.persona ? ' · ' + esc(i.persona) : ''}<br>${esc(fallback)}</span></div></div>${osc}${pins}${p}
+      ${(i.mock && i.mock.comments && i.mock.comments.length && fid) ? `<div class="bubbles">${i.mock.comments.slice(0, 3).map(c => `<div class="bubble"><b>Commenter</b>${esc(c)}</div>`).join('')}</div>` : ''}
+      ${(!fid && !ext && i.mock && i.mock.note) ? `<div class="cnote">${esc(i.mock.note)}</div>` : ''}
       ${fid ? `<a class="drivelink" href="${esc(pk.drive)}" target="_blank" rel="noopener">${pk.src ? 'Open product' : 'Open in Drive'} ↗</a>` : ext ? `<a class="drivelink" href="${esc(pk.drive)}" target="_blank" rel="noopener">Open in ${esc(ext)} ↗</a>` : ''}</div>`;
+}
+function winnerCard(i){
+  const w = i.mock && i.mock.winner; if (!w || !w.story) return '';
+  const [page, post] = String(w.story).split('_');
+  const href = w.video_id ? `https://www.facebook.com/${page}/videos/${w.video_id}/` : `https://www.facebook.com/${page}/posts/${post}`;
+  const src = w.video_id ? `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(href)}&show_text=0&width=300` : `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(href)}&width=300&show_text=0`;
+  return `<div class="variant winner"><div class="vlab">What it builds on <em class="win">${esc(w.brief || 'winner')}</em></div>
+      <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(w.ad || w.brief || 'The winner')}</b><small>Live ad, as it runs on Facebook${w.spend ? ' · $' + esc(w.spend) + ' spent' : ''}</small></div></div>
+      <div class="creative has-media" title="The winner"><iframe src="${esc(src)}" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="${esc(w.ad || 'winner')}"></iframe>
+        <a class="drivelink" href="${esc(w.notion || href)}" target="_blank" rel="noopener">${w.notion ? 'Open the brief' : 'Open on Facebook'} ↗</a></div></div>`;
 }
 function contentBox(i, appr){
   const pk = pickOf(i), cands = candsOf(i), fid = pk ? (pk.catalog_id || driveId(pk.drive)) : '';
@@ -457,7 +475,7 @@ function bodyOf(i){
     ${i.focus_fit ? `<div class="note"><b>Focus fit:</b> ${esc(i.focus_fit)}</div>` : ''}
     <div class="variants"><div class="variant"><div class="vlab">The ad <em>${esc(i.type || '')}</em></div>
       <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(NAMES[i.brand] || i.brand)}</b><small>Sponsored · mock ad</small></div></div>
-      ${creative(i)}</div></div>
+      ${creative(i)}</div>${winnerCard(i)}</div>
     <div class="cols">
       ${contentBox(i, appr)}
       <div class="box"><h4>Notes <small>${textNotes.length}</small></h4>${noteRows}${pend}${!noteRows && !pend ? '<span class="hint">Click the ad to pin a note, or write a general one.</span>' : ''}
