@@ -393,9 +393,13 @@ function status(t){ const m = document.getElementById('me'); if (m) m.dataset.ms
 function drawMe(msg){ const m = document.getElementById('me'); if (!m) return;
   m.innerHTML = (viewer ? `Reviewing as <b>${esc(viewer)}</b> · <a href="#" id="rename">change</a>` : `<a href="#" id="rename">Set your name</a>`) + (msg ? ` · ${esc(msg)}` : ''); }
 function askName(){ const n = prompt("Who's reviewing? (your first name)", viewer || '');
-  if (n && n.trim()) { viewer = n.trim(); try { localStorage.setItem('forgeName', viewer); } catch (e) {} render(); }
+  if (n && n.trim()) { viewer = n.trim(); try { localStorage.setItem('forgeName', viewer); } catch (e) {} render(); logOpen(); }
   return !!viewer; }
 async function save(rec){ if (!TOKEN) return; try { await SB.rpc('put_note', { p_token:TOKEN, p:rec }); status('Saved'); } catch (e) { status('Did not save: ' + e.message); } }
+// Oct 22 2026 (Hannes): tell him when someone opens a board. One 'open' row per reviewer per browser session; the laptop listener pings it.
+function logOpen(){ if (!TOKEN || !viewer || SOLO) return;
+  try { const k = 'forgeOpen_' + TOKEN; if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, '1'); } catch (e) {}
+  SB.rpc('put_note', { p_token:TOKEN, p:{ id:uid('op_'), kind:'open', assetId:'board', author:viewer, text:'', round:1 } }).catch(() => {}); }
 async function drop(id){ if (!TOKEN) return; try { await SB.rpc('del_note', { p_token:TOKEN, p_id:id }); status('Removed'); } catch (e) { status('Did not save: ' + e.message); } }
 
 const ideas = () => (board && board.ideas) || [];
@@ -641,8 +645,8 @@ document.querySelectorAll('[role="tab"]').forEach(t => t.addEventListener('click
       if (si) document.title = 'FORGE mock · ' + si.brand + ' · ' + si.title; }
     document.getElementById('meta').innerHTML = `Live board · <b>week of ${esc(board.week)}</b><br>${board.ideas.length} ideas · ${esc(board.lane_text || 'Dillon approves ATP, CTF, PLT · David approves TL, GU, OTX')}<br>Published ${esc(String(board.published || '').replace('T', ' '))}`;
     if (board.lane_text) { const ln = document.querySelector('.lane'); if (ln) ln.innerHTML = `<h3>Who approves</h3>${esc(board.lane_text)} Nothing builds until the approver says yes. Verdicts and notes go back to the Idea Library every hour.`; }
-    notes = (await SB.rpc('get_notes', { p_token:TOKEN }) || []).map(r => ({ id:r.id, kind:r.kind, asset_id:r.asset_id, author:r.author, body:r.body, state:r.state, x:r.x, y:r.y, img:r.img, link:r.link }));
-    render();
+    notes = (await SB.rpc('get_notes', { p_token:TOKEN }) || []).map(r => ({ id:r.id, kind:r.kind, asset_id:r.asset_id, author:r.author, body:r.body, state:r.state, x:r.x, y:r.y, img:r.img, link:r.link })).filter(n => n.kind !== 'open');
+    render(); logOpen();
     if (!viewer) setTimeout(askName, 500);
   } catch (e) { document.getElementById('board').innerHTML = `<p class="hint">Could not load this board. ${esc(e.message)}</p>`; }
 })();
