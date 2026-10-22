@@ -354,6 +354,8 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 .attbtn{border:1px dashed var(--line);border-radius:7px;padding:7px 13px;font-size:12.5px;
   font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap}
 .attbtn:hover{border-color:var(--accent);color:var(--accent)}
+.prevs{display:flex;flex-wrap:wrap;gap:8px}
+.atts{display:flex;flex-wrap:wrap;gap:6px}.atts .note-att{max-width:150px;width:auto;max-height:150px}
 .att input[type=text]{flex:1 1 180px;min-width:0}
 .prev{display:flex;gap:9px;align-items:center;margin-top:2px}
 .prev img{max-width:84px;height:auto;border-radius:6px;border:1px solid var(--line)}
@@ -943,6 +945,30 @@ function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&l
 function setStatus(t){ const el = $('#statusLine'); if (el) el.textContent = t; }
 function mmss(t){ const m = Math.floor(t/60), s = Math.floor(t%60); return m + ':' + String(s).padStart(2,'0'); }
 /* shrink a picked image in the browser so it travels with the note */
+/* Oct 22 2026 (Hannes): several images per note. One image stays a plain data URL; several are stored as a JSON list. */
+const MAXIMG = 10;
+function imgList(v){ if (!v) return []; if (v.charAt(0) === '[') { try { return JSON.parse(v); } catch(e) { return []; } } return [v]; }
+function imgPack(a){ return !a.length ? null : a.length === 1 ? a[0] : JSON.stringify(a); }
+function imgHtml(n){ const l = imgList(n.img); const h = l.map(u => '<img class="note-att" src="' + u + '" alt="Reference attached by ' + esc(n.author) + '">').join('');
+  return l.length > 1 ? '<div class="atts">' + h + '</div>' : h; }
+function wireAttach(input, prev, list){
+  const draw = () => {
+    prev.innerHTML = list.length ? '<div class="prevs">' + list.map((u,i) => '<div class="prev"><img src="' + u + '" alt="Attached reference ' + (i+1) + '">' +
+      '<button class="drop" type="button" data-i="' + i + '">Remove</button></div>').join('') + '</div>' : '';
+    prev.querySelectorAll('.drop').forEach(b => b.onclick = () => { list.splice(+b.dataset.i, 1); draw(); });
+  };
+  input.addEventListener('change', async ev => {
+    const fs = [...(ev.target.files || [])].slice(0, MAXIMG - list.length);
+    if (!fs.length) return;
+    prev.insertAdjacentHTML('beforeend', '<span class="status">Preparing ' + fs.length + (fs.length === 1 ? ' image' : ' images') + '…</span>');
+    let bad = 0;
+    for (const f of fs) { try { list.push(await shrink(f, 720, .65)); } catch(e) { bad++; } }
+    ev.target.value = '';
+    draw();
+    if (bad) prev.insertAdjacentHTML('beforeend', '<span class="status">' + bad + ' could not be read. Paste a link instead.</span>');
+  });
+  return draw;
+}
 function shrink(file, max, q){
   return new Promise((res, rej) => {
     const r = new FileReader();
@@ -956,7 +982,8 @@ function shrink(file, max, q){
           const c = document.createElement('canvas');
           c.width = Math.max(1, Math.round(im.width * s));
           c.height = Math.max(1, Math.round(im.height * s));
-          c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+          const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
+          cx.drawImage(im, 0, 0, c.width, c.height);
           res(c.toDataURL('image/jpeg', q));
         } catch(e) { rej(e); }
       };
@@ -1055,16 +1082,21 @@ function drawAssets(){
     '<div class="hdrow"><span class="count" id="c-general">0 notes</span></div></div>' +
     '<div class="lower"><div class="notes" id="n-general"></div>' +
     '<div class="gnote"><textarea id="gText" placeholder="Add an idea or comment"></textarea>' +
+    '<div class="att"><label class="attbtn" for="gFile">Attach images</label><input type="file" id="gFile" accept="image/*" multiple hidden></div>' +
+    '<div id="gPrev"></div>' +
     '<div class="row"><button class="btn" type="button" id="gSave">Add comment</button>' +
     '<span class="status">Enter to save, Shift + Enter for a new line</span></div></div></div>';
   $('#stack').appendChild(gen);
+  const gImgs = [];
+  const gDraw = wireAttach($('#gFile'), $('#gPrev'), gImgs);
   const gSave = async () => {
     const t = $('#gText').value.trim();
-    if (!t) return;
+    if (!t && !gImgs.length) return;
     if (!viewer){ draft = { general:true }; askName(); return; }
     $('#gText').value = '';
+    const img = imgPack(gImgs.splice(0)); gDraw();
     await persist({ id: 'g' + Date.now() + Math.random().toString(36).slice(2,7), assetId: 'general', round,
-                    x:null, y:null, t:null, author: viewer, text: t, createdAt: new Date().toISOString() });
+                    x:null, y:null, t:null, author: viewer, text: t, img, createdAt: new Date().toISOString() });
   };
   $('#gSave').onclick = gSave;
   $('#gText').addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); gSave(); } });
@@ -1124,8 +1156,8 @@ function openDraft(asset, at, why){
       (at.t != null ? ' at <b>' + mmss(at.t) + '</b>' : ' at <b>' + Math.round(at.x) + '%, ' + Math.round(at.y) + '%</b>') +
       ' &middot; round ' + round + '</div>' +
     '<textarea id="dText" placeholder="What needs to change, and why"></textarea>' +
-    '<div class="att"><label class="attbtn" for="dFile">Attach an image</label>' +
-    '<input type="file" id="dFile" accept="image/*" hidden>' +
+    '<div class="att"><label class="attbtn" for="dFile">Attach images</label>' +
+    '<input type="file" id="dFile" accept="image/*" multiple hidden>' +
     '<input type="text" id="dLink" placeholder="or paste a link to the asset you want"></div>' +
     '<div id="dPrev"></div>' +
     '<div class="row"><button class="btn" type="button" id="dSave">Leave note</button>' +
@@ -1134,32 +1166,18 @@ function openDraft(asset, at, why){
   const ta = k.querySelector('#dText');
   try { ta.focus({ preventScroll:true }); } catch(e) { ta.focus(); }
   k.scrollIntoView({ block:'nearest' });
-  let attached = null;
-  const prev = k.querySelector('#dPrev');
-  k.querySelector('#dFile').addEventListener('change', async ev => {
-    const f = ev.target.files && ev.target.files[0];
-    if (!f) return;
-    prev.innerHTML = '<span class="status">Preparing image…</span>';
-    try {
-      attached = await shrink(f, 720, .65);
-      prev.innerHTML = '<div class="prev"><img src="' + attached + '" alt="Attached reference">' +
-                       '<button class="drop" type="button" id="dDrop">Remove</button></div>';
-      prev.querySelector('#dDrop').onclick = () => { attached = null; prev.innerHTML = ''; ev.target.value = ''; };
-    } catch(e) {
-      attached = null;
-      prev.innerHTML = '<span class="status">That image could not be read. Paste a link instead.</span>';
-    }
-  });
+  const attached = [];
+  wireAttach(k.querySelector('#dFile'), k.querySelector('#dPrev'), attached);
   const close = () => { k.hidden = true; draft = null; pendingVerdict = null; };
   const save = async () => {
     const t = ta.value.trim();
     const link = k.querySelector('#dLink').value.trim();
-    if (!t && !link && !attached) return;
+    if (!t && !link && !attached.length) return;
     k.querySelector('#dSave').disabled = true;
     await persist({
       id: 'n' + Date.now() + Math.random().toString(36).slice(2,7),
       assetId: asset.id, round, x: at.x ?? null, y: at.y ?? null, t: at.t ?? null,
-      author: viewer, text: t, img: attached || null, link: link || null,
+      author: viewer, text: t, img: imgPack(attached), link: link || null,
       createdAt: new Date().toISOString()
     });
     const pv = (pendingVerdict && pendingVerdict.assetId === asset.id) ? pendingVerdict : null;
@@ -1230,7 +1248,7 @@ function redraw(){
       '<div class="note-meta"><b>' + esc(n.author) + '</b> &middot; ' +
       (n.t != null ? '<button class="ts" type="button" data-seek="' + n.t + '" data-a="' + a.id + '">' + mmss(n.t) + '</button>' : 'pin ' + Math.round(n.x) + '%, ' + Math.round(n.y) + '%') +
       delUI(n) + '</div>' + noteBody(n) +
-      (n.img ? '<img class="note-att" src="' + n.img + '" alt="Reference attached by ' + esc(n.author) + '">' : '') +
+      imgHtml(n) +
       (n.link ? '<a class="note-link" href="' + esc(n.link) + '" target="_blank" rel="noopener">' + esc(n.link) + '</a>' : '') +
       '</div></div>'
     ).join('') : '<div class="empty">No notes on this one yet.</div>';
@@ -1259,7 +1277,7 @@ function drawGeneral(){
   if (c) c.textContent = g.length + (g.length === 1 ? ' note' : ' notes');
   box.innerHTML = g.length ? g.map((n,i) =>
     '<div class="note"><div class="note-n">' + (i+1) + '</div><div class="note-b">' +
-    '<div class="note-meta"><b>' + esc(n.author) + '</b>' + delUI(n) + '</div>' + noteBody(n) +
+    '<div class="note-meta"><b>' + esc(n.author) + '</b>' + delUI(n) + '</div>' + noteBody(n) + imgHtml(n) +
     (n.link ? '<a class="note-link" href="' + esc(n.link) + '" target="_blank" rel="noopener">' + esc(n.link) + '</a>' : '') +
     '</div></div>').join('') : '<div class="empty">Nothing here yet.</div>';
 }
