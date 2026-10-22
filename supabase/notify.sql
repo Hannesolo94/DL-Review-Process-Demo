@@ -64,7 +64,7 @@ returns trigger language plpgsql security definer set search_path = public as $$
 declare b public.briefs; who text; tag text; msg text; n_ok int; n_ch int; n_notes int;
 begin
   select * into b from public.briefs where id = new.brief_id;
-  if b.id is null then return new; end if;
+  if b.id is null or b.brand = 'FG' then return new; end if;    -- Oct 22: FORGE boards post to #forge-notifications instead
   who := coalesce(new.author, 'Someone');
   if craft_is_muted(who) then return new; end if;               -- mute list (Hannes never gets pinged about himself)
   tag := case when new.audience = 'client' then ' (client)' else '' end;
@@ -151,7 +151,7 @@ declare b public.briefs; who text; n_ok int; n_ch int; msg text; v_assets text; 
 begin
   if new.kind <> 'done' then return new; end if;
   select * into b from public.briefs where id = new.brief_id;
-  if b.id is null then return new; end if;
+  if b.id is null or b.brand = 'FG' then return new; end if;
   who := coalesce(new.author, 'Someone');
   if craft_is_muted(who) then return new; end if;
   select count(*) filter (where state = 'approved'), count(*) filter (where state = 'changes') into n_ok, n_ch
@@ -180,3 +180,42 @@ end; $$;
 drop trigger if exists craft_notify_brand_done on public.notes;
 create trigger craft_notify_brand_done after insert on public.notes
   for each row execute function public.craft_notify_brand_done();
+
+
+-- Oct 22 2026 (Hannes): FORGE boards get their own channel, #forge-notifications (C0CC517D4JC).
+-- Two pings: someone OPENS a board (forge.html writes one kind='open' row per reviewer per browser session),
+-- and someone presses "I'm done reviewing" (idea counts: approved / changes / killed / not judged).
+-- Webhook in Vault as craft_slack_webhook_fg (CRAFT Alerts app, Incoming Webhooks). No secret = nothing sent.
+create or replace function public.forge_notify()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare b public.briefs; who text; lbl text; n_ideas int; n_ok int; n_ch int; n_kill int; n_notes int;
+begin
+  if new.kind not in ('open', 'done') then return new; end if;
+  select * into b from public.briefs where id = new.brief_id;
+  if b.id is null or b.brand <> 'FG' then return new; end if;
+  who := coalesce(nullif(trim(new.author), ''), 'Someone');
+  if craft_is_muted(who) then return new; end if;
+  lbl := '<https://hannesolo94.github.io/DL-Review-Process-Demo/forge.html?b=' || b.creator_token || '|'
+         || coalesce(nullif(b.data->>'lane_text', ''), b.title, b.slug) || '>';
+  if new.kind = 'open' then
+    perform craft_slack_brand('fg', '<@U0757BQ1RFW> :eyes: *' || who || '* opened the FORGE board ' || lbl);
+    return new;
+  end if;
+  n_ideas := coalesce(jsonb_array_length(b.data->'ideas'), 0);
+  select count(*) filter (where state = 'approved'), count(*) filter (where state = 'changes'), count(*) filter (where state = 'killed')
+    into n_ok, n_ch, n_kill
+  from (select distinct on (asset_id) asset_id, state from public.notes
+        where brief_id = new.brief_id and kind = 'verdict' and lower(author) = lower(new.author)
+        order by asset_id, created_at desc) v;
+  select count(*) into n_notes from public.notes
+  where brief_id = new.brief_id and kind = 'note' and lower(author) = lower(new.author) and coalesce(body, '') <> '';
+  perform craft_slack_brand('fg', '<@U0757BQ1RFW> :white_check_mark: *' || who || '* finished reviewing the FORGE board ' || lbl || ': '
+          || n_ok || ' approved, ' || n_ch || ' changes, ' || n_kill || ' killed, '
+          || greatest(n_ideas - n_ok - n_ch - n_kill, 0) || ' of ' || n_ideas || ' not judged, '
+          || n_notes || case when n_notes = 1 then ' note' else ' notes' end);
+  return new;
+end; $$;
+
+drop trigger if exists forge_notify on public.notes;
+create trigger forge_notify after insert on public.notes
+  for each row execute function public.forge_notify();
