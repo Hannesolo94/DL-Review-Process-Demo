@@ -204,6 +204,9 @@ nav.tabs,.rail,#p-flow,#p-fri,#p-wed{display:none!important}
 .creative .cnote{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;background:rgba(0,0,0,.65);color:#fff;font:400 12px var(--body)}
 .creative iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:#000}
 .creative.has-media .typecard{display:none}
+/* Oct 26 2026 (Hannes): every idea previews Static A/B + Video A/B, the standard on all boards */
+.creative .vtag{position:absolute;left:8px;bottom:8px;max-width:62%;font:600 11px var(--mono);background:rgba(0,0,0,.72);color:#fff;padding:3px 8px;border-radius:6px;z-index:3;overflow-wrap:anywhere}
+.variant .vsub{padding:6px 10px;font:400 11px var(--body);color:var(--muted);border-top:1px solid var(--line);overflow-wrap:anywhere}
 .creative .osc .l1{text-wrap:balance}
 .creative .drivelink{position:absolute;right:8px;bottom:8px;font:500 11px var(--mono);background:rgba(0,0,0,.6);color:#fff;padding:3px 8px;border-radius:6px;text-decoration:none;pointer-events:auto}
 .content .pickrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -439,6 +442,32 @@ function creative(i){
       ${(!fid && !ext && i.mock && i.mock.note) ? `<div class="cnote">${esc(i.mock.note)}</div>` : ''}
       ${fid ? `<a class="drivelink" href="${esc(pk.drive)}" target="_blank" rel="noopener">${pk.src ? 'Open product' : 'Open in Drive'} ↗</a>` : ext ? `<a class="drivelink" href="${esc(pk.drive)}" target="_blank" rel="noopener">Open in ${esc(ext)} ↗</a>` : ''}</div>`;
 }
+// Oct 26 2026 (Hannes): "for all add a A/B static and a A/B video" + "make this preview the standard".
+// Static A is the main ad (pins, content swaps). The other three come from mock.ads when the builder set them,
+// else from the content candidates in order, so every board gets the four without extra work.
+function adSet(i){
+  const m = i.mock || {}, pk = pickOf(i);
+  if (m.ads && m.ads.length) return m.ads.map((a, k) => k === 0 ? Object.assign({}, a, { item: pk || a.item }) : a);
+  const pool = [pk].concat(candsOf(i).filter(c => !pk || c.catalog_id !== pk.catalog_id)).filter(Boolean);
+  const at = k => pool.length ? pool[k % pool.length] : null;
+  return [['Static A','static'],['Static B','static'],['Video A','video'],['Video B','video']].map(([label, kind], k) => ({ label, kind, item: at(k) }));
+}
+function adCard(i, a, k){
+  const it = a.item || null, isDrive = s => /^[\w-]{20,}$/.test(s || '');
+  const fid = it && !it.src ? (isDrive(it.catalog_id) ? it.catalog_id : driveId(it.drive)) : '';
+  const L = oscOf(i), line = a.line || (/ B$/.test(a.label) ? L[1] : L[0]) || i.title;
+  let media = '';
+  if (it && it.src) media = `<img src="${esc(it.src)}" alt="${esc(it.title || '')}" loading="lazy" onerror="mockErr(this)" style="object-fit:contain;background:#fff">`;
+  else if (fid && it.kind === 'video') media = `<iframe src="${esc(VID(fid))}" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="${esc(it.title || 'Video')}"></iframe>`;
+  else if (fid) media = `<img src="${esc(IMG(fid))}" data-alt="${esc(IMG2(fid))}" alt="${esc(it.title || '')}" loading="lazy" onerror="mockErr(this)">`;
+  const open = it && it.drive ? `<a class="drivelink" href="${esc(it.drive)}" target="_blank" rel="noopener">Open ↗</a>` : '';
+  return `<div class="variant"><div class="vlab">${esc(a.label)} <em>${a.kind === 'video' ? 'video' : 'static'}</em></div>
+      <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(NAMES[i.brand] || i.brand)}</b><small>Sponsored · mock ad</small></div></div>
+      <div class="creative ${media ? 'has-media' : ''}" data-id="${esc(i.id)}">${media}<div class="typecard"><div><div class="q">${esc(i.title)}</div><span class="s">${esc(a.label)}<br>${it ? 'Content could not load. Open it in Drive.' : 'No content yet.'}</span></div></div>
+        <div class="osc${a.kind === 'video' ? ' onvideo' : ''}"><span class="l1">${esc(line)}</span></div>
+        ${a.kind === 'video' ? `<div class="vtag">▶ Video${a.song ? ' · ' + esc(a.song) : ''}</div>` : ''}${open}</div>
+      ${it && it.title ? `<div class="vsub">${esc(it.title)}${a.note ? ' · ' + esc(a.note) : ''}</div>` : ''}</div>`;
+}
 function winnerCard(i){
   const w = i.mock && i.mock.winner; if (!w || !w.story) return '';
   const [page, post] = String(w.story).split('_');
@@ -495,9 +524,9 @@ function bodyOf(i){
       ${i.what_changed ? `<div><span>What changed</span>${esc(i.what_changed)}</div>` : ''}
     </div>
     ${i.focus_fit ? `<div class="note"><b>Focus fit:</b> ${esc(i.focus_fit)}</div>` : ''}
-    <div class="variants"><div class="variant"><div class="vlab">The ad <em>${esc(i.type || '')}</em></div>
+    <div class="variants"><div class="variant"><div class="vlab">${esc((adSet(i)[0] || {}).label || 'Static A')} <em>${esc(i.type || '')}</em></div>
       <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(NAMES[i.brand] || i.brand)}</b><small>Sponsored · mock ad</small></div></div>
-      ${creative(i)}</div>${winnerCard(i)}</div>
+      ${creative(i)}</div>${adSet(i).slice(1).map((a, k) => adCard(i, a, k + 1)).join('')}${winnerCard(i)}</div>
     <div class="cols">
       ${contentBox(i, appr)}
       ${oscBox(i)}
