@@ -562,7 +562,7 @@ const fromRow = r => ({
   primaries:r.primaries, state:r.state, createdAt:r.created_at
 });
 
-let SLUG = '', CLIENT_COPY = false, round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
+let SLUG = '', CLIENT_COPY = false, VL = {}, round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
 
 /* ---- which view: the link decides, the switch is for demoing ---- */
 let view = (location.hash || '').replace('#','').toLowerCase() === 'client' ? 'client' : 'creator';
@@ -639,7 +639,7 @@ async function boot(){
       if (d.assets && d.assets.length) ASSETS = d.assets;
       if (d.brand) BRAND = d.brand;
       if (d.copy)  COPY  = d.copy;
-      CLIENT_COPY = !!d.clientCopy;
+      CLIENT_COPY = !!d.clientCopy; VL = d.verdictLabels || {};   /* Oct 29: per page button words, e.g. Run it / Don't run */
       round = b.round || 1;
       SLUG = b.slug || '';
       view = (b.view === 'client') ? 'client' : 'creator';
@@ -798,7 +798,7 @@ function drawVerdicts(){
     const st = document.getElementById('s-' + a.id);
     if (st){
       st.hidden = !v;
-      if (v){ st.dataset.s = v.state; st.textContent = v.state === 'approved' ? 'Approved' : 'Needs changes'; }
+      if (v){ st.dataset.s = v.state; st.textContent = v.state === 'approved' ? (VL.okDone || 'Approved') : (VL.noDone || 'Needs changes'); }
     }
     const w = document.getElementById('w-' + a.id);
     /* everyone's call, by name. The team also sees the client's, marked with a dashed outline. */
@@ -1055,11 +1055,11 @@ function drawAssets(){
         '<button class="vbtn ok" type="button" data-ok="' + a.id + '" aria-pressed="false">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" ' +
           'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-          '<path d="M20 6L9 17l-5-5"/></svg>Approve</button>' +
+          '<path d="M20 6L9 17l-5-5"/></svg>' + esc(VL.ok || 'Approve') + '</button>' +
         '<button class="vbtn no" type="button" data-no="' + a.id + '" aria-pressed="false">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" ' +
           'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-          '<path d="M18 6L6 18M6 6l12 12"/></svg>Needs changes</button>' +
+          '<path d="M18 6L6 18M6 6l12 12"/></svg>' + esc(VL.no || 'Needs changes') + '</button>' +
         '<span class="vwho" id="w-' + a.id + '"></span>' +
       '</div>' +
       '<div class="lpline">Sends to <a href="' + esc(a.lp) + '" target="_blank" rel="noopener">' + esc(a.lp.replace(/^https?:\/\/(www\.)?/, '')) + '</a></div>' +
