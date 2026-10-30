@@ -202,6 +202,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .asset-hd{padding:14px 16px 12px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
 .asset-hd h3{font-size:15.5px}
 .asset-hd .spec{font-size:12px;color:var(--faint);margin-top:3px;font-variant-numeric:tabular-nums}
+.tnote{padding:10px 16px 4px} .tnote textarea{width:100%;box-sizing:border-box;font:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-height:52px}
+.tnote .row{display:flex;gap:10px;align-items:center;margin-top:6px}
 .prev{margin:10px 0 0;border:1px solid var(--line);border-left:3px solid var(--faint);border-radius:6px;padding:10px 12px;background:var(--surface)}
 .prev h4{margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .prev ul{margin:0;padding-left:18px} .prev li{margin:3px 0;font-family:var(--prose);font-size:14px}
@@ -566,7 +568,7 @@ const fromRow = r => ({
   primaries:r.primaries, state:r.state, createdAt:r.created_at
 });
 
-let SLUG = '', CLIENT_COPY = false, VL = {}, PREV = {}, round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
+let SLUG = '', CLIENT_COPY = false, VL = {}, PREV = {}, TYPE_NOTES = false, round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
 
 /* ---- which view: the link decides, the switch is for demoing ---- */
 let view = (location.hash || '').replace('#','').toLowerCase() === 'client' ? 'client' : 'creator';
@@ -643,7 +645,7 @@ async function boot(){
       if (d.assets && d.assets.length) ASSETS = d.assets;
       if (d.brand) BRAND = d.brand;
       if (d.copy)  COPY  = d.copy;
-      CLIENT_COPY = !!d.clientCopy; VL = d.verdictLabels || {}; PREV = { label: d.prevLabel, general: d.prevGeneral };   /* Oct 29: per page button words, e.g. Run it / Don't run */
+      CLIENT_COPY = !!d.clientCopy; VL = d.verdictLabels || {}; PREV = { label: d.prevLabel, general: d.prevGeneral }; TYPE_NOTES = !!d.typeNotes;   /* Oct 30: a type-in note box under every static */   /* Oct 29: per page button words, e.g. Run it / Don't run */
       round = b.round || 1;
       SLUG = b.slug || '';
       view = (b.view === 'client') ? 'client' : 'creator';
@@ -1077,6 +1079,9 @@ function drawAssets(){
       '<div class="lpline">Sends to <a href="' + esc(a.lp) + '" target="_blank" rel="noopener">' + esc(a.lp.replace(/^https?:\/\/(www\.)?/, '')) + '</a></div>' +
       '<div class="adprev" id="p-' + a.id + '"></div>' +
       prevHtml(a.prev) +
+      (TYPE_NOTES && a.kind === 'image'
+        ? '<div class="tnote"><textarea id="tn-' + a.id + '" placeholder="Type a note on this ad, or click the creative to pin one to a spot"></textarea>' +
+          '<div class="row"><button class="btn" type="button" data-tn="' + a.id + '">Leave note</button><span class="status">Enter to save, Shift + Enter for a new line</span></div></div>' : '') +
       (a.kind === 'video' && a.src
         ? '<div class="vbar"><button class="btn" type="button" id="vt-' + a.id + '">Note this moment</button>' +
           '<span class="vnow">at <b id="vn-' + a.id + '">0:00</b></span></div>' : '') +
@@ -1085,6 +1090,18 @@ function drawAssets(){
         '<div class="composer" id="k-' + a.id + '" hidden></div>' +
       '</div>';
     stack.appendChild(el);
+    const tn = el.querySelector('#tn-' + CSS.escape(a.id));
+    if (tn){   /* Oct 30 (Hannes): typing a note must be as easy as on the comments card, no pin needed */
+      const save = async () => {
+        const t = tn.value.trim(); if (!t) return;
+        if (!viewer){ askName(); return; }   /* the text stays in the box until they've named themselves */
+        tn.value = '';
+        await persist({ id: 'n' + Date.now() + Math.random().toString(36).slice(2,7), assetId: a.id, round,
+                        x:null, y:null, t:null, author: viewer, text: t, img: null, link: null, createdAt: new Date().toISOString() });
+      };
+      el.querySelector('[data-tn]').onclick = save;
+      tn.addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing){ ev.preventDefault(); save(); } });
+    }
   });
 
   /* Oct 6: general ideas and comments that are not about one spot on one ad */
@@ -1260,7 +1277,7 @@ function redraw(){
     box.innerHTML = mine.length ? mine.map((n,i) =>
       '<div class="note"><div class="note-n">' + (i+1) + '</div><div class="note-b">' +
       '<div class="note-meta"><b>' + esc(n.author) + '</b> &middot; ' +
-      (n.t != null ? '<button class="ts" type="button" data-seek="' + n.t + '" data-a="' + a.id + '">' + mmss(n.t) + '</button>' : 'pin ' + Math.round(n.x) + '%, ' + Math.round(n.y) + '%') +
+      (n.t != null ? '<button class="ts" type="button" data-seek="' + n.t + '" data-a="' + a.id + '">' + mmss(n.t) + '</button>' : n.x == null ? 'on the whole ad' : 'pin ' + Math.round(n.x) + '%, ' + Math.round(n.y) + '%') +
       delUI(n) + '</div>' + noteBody(n) +
       imgHtml(n) +
       (n.link ? '<a class="note-link" href="' + esc(n.link) + '" target="_blank" rel="noopener">' + esc(n.link) + '</a>' : '') +
