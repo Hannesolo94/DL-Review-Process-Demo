@@ -202,6 +202,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 .asset-hd{padding:14px 16px 12px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
 .asset-hd h3{font-size:15.5px}
 .asset-hd .spec{font-size:12px;color:var(--faint);margin-top:3px;font-variant-numeric:tabular-nums}
+.prev{margin:10px 0 0;border:1px solid var(--line);border-left:3px solid var(--faint);border-radius:6px;padding:10px 12px;background:var(--surface)}
+.prev h4{margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.prev ul{margin:0;padding-left:18px} .prev li{margin:3px 0;font-family:var(--prose);font-size:14px}
+.prev .pw{font-family:inherit;font-size:12px;color:var(--muted);margin-right:6px} .prev .note-att{max-width:120px;margin:4px 6px 0 0}
 .asset-hd .osc{font-family:var(--prose);font-size:14px;color:var(--muted);margin-top:6px}
 .count{font-size:12px;color:var(--muted);white-space:nowrap;
   border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-variant-numeric:tabular-nums}
@@ -562,7 +566,7 @@ const fromRow = r => ({
   primaries:r.primaries, state:r.state, createdAt:r.created_at
 });
 
-let SLUG = '', CLIENT_COPY = false, VL = {}, round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
+let SLUG = '', CLIENT_COPY = false, VL = {}, PREV = {}, round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
 
 /* ---- which view: the link decides, the switch is for demoing ---- */
 let view = (location.hash || '').replace('#','').toLowerCase() === 'client' ? 'client' : 'creator';
@@ -639,7 +643,7 @@ async function boot(){
       if (d.assets && d.assets.length) ASSETS = d.assets;
       if (d.brand) BRAND = d.brand;
       if (d.copy)  COPY  = d.copy;
-      CLIENT_COPY = !!d.clientCopy; VL = d.verdictLabels || {};   /* Oct 29: per page button words, e.g. Run it / Don't run */
+      CLIENT_COPY = !!d.clientCopy; VL = d.verdictLabels || {}; PREV = { label: d.prevLabel, general: d.prevGeneral };   /* Oct 29: per page button words, e.g. Run it / Don't run */
       round = b.round || 1;
       SLUG = b.slug || '';
       view = (b.view === 'client') ? 'client' : 'creator';
@@ -947,6 +951,14 @@ function mmss(t){ const m = Math.floor(t/60), s = Math.floor(t%60); return m + '
 /* shrink a picked image in the browser so it travels with the note */
 /* Oct 22 2026 (Hannes): several images per note. One image stays a plain data URL; several are stored as a JSON list. */
 const MAXIMG = 10;
+/* Oct 30 2026 (Hannes): a V2 page shows what the reviewer asked for last round under each ad (data.prevLabel), so he can
+   check it was done and leave new notes on the new design. a.prev / data.prevGeneral = [{who, text, t, img}] */
+function prevHtml(list){
+  if (!list || !list.length) return '';
+  return '<div class="prev"><h4>' + esc(PREV.label || 'Notes from the last round') + '</h4><ul>' + list.map(n =>
+    '<li><span class="pw">' + esc(n.who) + (n.t != null ? ' at ' + mmss(n.t) : '') + '</span>' + esc(n.text) +
+    imgList(n.img).map(u => '<br><img class="note-att" src="' + u + '" alt="">').join('') + '</li>').join('') + '</ul></div>';
+}
 function imgList(v){ if (!v) return []; if (v.charAt(0) === '[') { try { return JSON.parse(v); } catch(e) { return []; } } return [v]; }
 function imgPack(a){ return !a.length ? null : a.length === 1 ? a[0] : JSON.stringify(a); }
 function imgHtml(n){ const l = imgList(n.img); const h = l.map(u => '<img class="note-att" src="' + u + '" alt="Reference attached by ' + esc(n.author) + '">').join('');
@@ -1064,6 +1076,7 @@ function drawAssets(){
       '</div>' +
       '<div class="lpline">Sends to <a href="' + esc(a.lp) + '" target="_blank" rel="noopener">' + esc(a.lp.replace(/^https?:\/\/(www\.)?/, '')) + '</a></div>' +
       '<div class="adprev" id="p-' + a.id + '"></div>' +
+      prevHtml(a.prev) +
       (a.kind === 'video' && a.src
         ? '<div class="vbar"><button class="btn" type="button" id="vt-' + a.id + '">Note this moment</button>' +
           '<span class="vnow">at <b id="vn-' + a.id + '">0:00</b></span></div>' : '') +
@@ -1080,6 +1093,7 @@ function drawAssets(){
   gen.innerHTML = '<div class="asset-hd"><div><h3>Other ideas and comments</h3>' +
     '<div class="ghint">Anything that isn&rsquo;t about one spot on one ad: a new idea, a variation to add, a general thought.</div></div>' +
     '<div class="hdrow"><span class="count" id="c-general">0 notes</span></div></div>' +
+    prevHtml(PREV.general) +
     '<div class="lower"><div class="notes" id="n-general"></div>' +
     '<div class="gnote"><textarea id="gText" placeholder="Add an idea or comment"></textarea>' +
     '<div class="att"><label class="attbtn" for="gFile">Attach images</label><input type="file" id="gFile" accept="image/*" multiple hidden></div>' +
