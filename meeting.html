@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Meeting notes</title>
+<style>
+:root { color-scheme: light dark; --bg:#fbfaf7; --ink:#1d1f1a; --dim:#6b6e64; --line:#dfddd4; --card:#fff; --accent:#47601f; }
+@media (prefers-color-scheme: dark) { :root { --bg:#10130d; --ink:#e9eddf; --dim:#9aa08c; --line:#2a2f22; --card:#171b12; --accent:#b8e06a; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 Inter, 'Segoe UI', system-ui, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 26px; line-height: 1.25; margin: 0 0 4px; } h2 { font-size: 13px; letter-spacing: .08em; color: var(--dim); margin: 32px 0 8px; }
+.meta { color: var(--dim); font-size: 14px; }
+.box { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; white-space: pre-wrap; }
+.who { font-weight: 700; margin-top: 16px; } .who span { color: var(--dim); font-weight: 400; font-size: 13px; margin-left: 8px; }
+.line { margin: 2px 0; } ul { margin: 0; padding-left: 20px; }
+.gone { text-align: center; padding-top: 80px; color: var(--dim); }
+</style></head>
+<body><main id="m"><p class="gone">Loading...</p></main>
+<script>
+const CFG = { url: 'https://yobtgnpwbqcnvedzrmlh.supabase.co', key: 'sb_publishable_aHRdYPgnKxgvM3QSVUqs3Q_8mCqQ3KM' };
+const main = document.getElementById('m');
+const el = (t, c, x) => { const n = document.createElement(t); if (c) n.className = c; if (x != null) n.textContent = x; return n; };
+const gone = (t) => { main.replaceChildren(el('p', 'gone', t)); };
+(async () => {
+  const token = new URLSearchParams(location.search).get('m');
+  if (!token) return gone('This link is not complete.');
+  let d; try {
+    const r = await fetch(`${CFG.url}/rest/v1/rpc/get_meeting_share`, { method: 'POST', headers: { apikey: CFG.key, Authorization: `Bearer ${CFG.key}`, 'content-type': 'application/json' }, body: JSON.stringify({ p_token: token }) });
+    d = await r.json();
+  } catch (_) { return gone('Could not load this page. Try again in a minute.'); }
+  if (!d || !d.transcript) return gone('This link has ended.');
+  document.title = d.title;
+  const out = [el('h1', '', d.title), el('div', 'meta', [d.started ? new Date(d.started).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '', 'Link ends ' + new Date(d.expires_at).toLocaleDateString('en-GB', { dateStyle: 'medium' })].filter(Boolean).join(' · '))];
+  if (d.summary) out.push(el('h2', '', 'SUMMARY'), el('div', 'box', d.summary));
+  if (d.tasks && d.tasks.length) { const u = el('ul'); d.tasks.forEach((t) => u.append(el('li', '', [t.who, t.what].filter(Boolean).join(': ')))); const b = el('div', 'box'); b.style.whiteSpace = 'normal'; b.append(u); out.push(el('h2', '', 'TASKS'), b); }
+  out.push(el('h2', '', 'FULL TRANSCRIPT'));
+  for (const l of d.transcript.split('\n').slice(3)) {
+    const w = /^\*\*(.+?)\*\* \[(.+?)\]$/.exec(l);
+    if (w) { const n = el('div', 'who', w[1]); n.append(el('span', '', w[2])); out.push(n); } else if (l.trim()) out.push(el('div', 'line', l));
+  }
+  main.replaceChildren(...out);
+})();
+</script></body></html>
