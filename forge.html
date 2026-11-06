@@ -206,6 +206,11 @@ nav.tabs,.rail,#p-flow,#p-fri,#p-wed{display:none!important}
 .creative.has-media .typecard{display:none}
 /* Oct 26 2026 (Hannes): every idea previews Static A/B + Video A/B, the standard on all boards */
 .creative .vtag{position:absolute;left:8px;bottom:8px;max-width:62%;font:600 11px var(--mono);background:rgba(0,0,0,.72);color:#fff;padding:3px 8px;border-radius:6px;z-index:3;overflow-wrap:anywhere}
+.variant .adfoot{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--panel2,rgba(255,255,255,.04));border-top:1px solid var(--line)}
+.variant .adfoot .af-t{min-width:0;flex:1}.variant .adfoot small{display:block;font:600 10px var(--body);letter-spacing:.04em;color:var(--muted)}
+.variant .adfoot b{display:block;font:700 13px var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.variant .adfoot .af-b{flex:none;padding:7px 12px;border-radius:6px;background:var(--line);font:700 12px var(--body)}
+.variant .creative{border-radius:0}
 .variant .vsub{padding:6px 10px;font:400 11px var(--body);color:var(--muted);border-top:1px solid var(--line);overflow-wrap:anywhere}
 .creative .osc .l1{text-wrap:balance}
 .creative .drivelink{position:absolute;right:8px;bottom:8px;font:500 11px var(--mono);background:rgba(0,0,0,.6);color:#fff;padding:3px 8px;border-radius:6px;text-decoration:none;pointer-events:auto}
@@ -384,6 +389,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&am
 const whoKey = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24) || 'someone';
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const NAMES = { TL:'Threat Llama', GU:'Goons Up', OTX:'On The X', ATP:'American Trigger Pullers', CTF:'Carry The Fire', PLT:'PLTDaddy' };
+const DOMAINS = { TL:'threatllama.com', GU:'goonsup.com', OTX:'onthex.co', ATP:'americantriggerpullers.com', CTF:'carrythefire.com', PLT:'pltdaddy.com' };   // Nov 6: the Facebook-style ad footer
 const ORDER = ['PLT','ATP','CTF','TL','GU','OTX'];               // Dillon's client brands first, then David's partner brands
 const SRC = { Machine:['t-x','Data · idea engine'], Competitor:['t-c','Competitor · Atria'], Hannes:['t-h','Strategist · Hannes'],
   Dillon:['t-d','Dillon'], David:['t-d','David'], Client:['t-c','Client'], Call:['t-h','Call'] };
@@ -466,7 +472,8 @@ function adCard(i, a, k){
       <div class="creative ${media ? 'has-media' : ''}" data-id="${esc(i.id)}">${media}<div class="typecard"><div><div class="q">${esc(i.title)}</div><span class="s">${esc(a.label)}<br>${it ? 'Content could not load. Open it in Drive.' : 'No content yet.'}</span></div></div>
         <div class="osc${a.kind === 'video' ? ' onvideo' : ''}"><span class="l1">${esc(line)}</span></div>
         ${a.kind === 'video' ? `<div class="vtag">▶ Video${a.song ? ' · ' + esc(a.song) : ''}</div>` : ''}${open}</div>
-      ${it && it.title ? `<div class="vsub">${esc(it.title)}${a.note ? ' · ' + esc(a.note) : ''}</div>` : ''}</div>`;
+      <div class="adfoot"><div class="af-t"><small>${esc((DOMAINS[i.brand] || '').toUpperCase())}</small><b>${esc(line)}</b></div><span class="af-b">Shop now</span></div>
+      ${it && it.title ?`<div class="vsub">${esc(it.title)}${a.note ? ' · ' + esc(a.note) : ''}</div>` : ''}</div>`;
 }
 function winnerCard(i){
   const w = i.mock && i.mock.winner; if (!w || !w.story) return '';
