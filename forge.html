@@ -471,7 +471,7 @@ function adCard(i, a, k){
   return `<div class="variant"><div class="vlab">${esc(a.label)} <em>${a.kind === 'video' ? 'video' : 'static'}</em></div>
       <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(NAMES[i.brand] || i.brand)}</b><small>Sponsored · mock ad</small></div></div>
       <div class="creative ${media ? 'has-media' : ''}" data-id="${esc(i.id)}">${media}<div class="typecard"><div><div class="q">${esc(i.title)}</div><span class="s">${esc(a.label)}<br>${it ? 'Content could not load. Open it in Drive.' : 'No content yet.'}</span></div></div>
-        ${it && it.rating === 'Mock' ? '' : `<div class="osc${a.kind === 'video' ? ' onvideo' : ''}"><span class="l1">${esc(line)}</span></div>`}
+        <div class="osc${a.kind === 'video' ? ' onvideo' : ''}"><span class="l1">${esc(line)}</span></div>
         ${a.kind === 'video' ? `<div class="vtag">▶ Video${a.song ? ' · ' + esc(a.song) : ''}</div>` : ''}${open}</div>
       <div class="adfoot"><div class="af-t"><small>${esc((DOMAINS[i.brand] || '').toUpperCase())}</small><b>${esc(line)}</b></div><span class="af-b">Shop now</span></div>
       ${it && it.rating === 'Mock' && it.what ? `<ul class="why">${String(it.what).split(' | ').slice(0, 2).map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
