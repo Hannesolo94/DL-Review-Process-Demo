@@ -25,7 +25,7 @@
   --src-h:#9db8e6; --src-h-soft:#1d2a3d; --src-d:#c7a8ea; --src-d-soft:#2a2136; --src-c:#e3b46a; --src-c-soft:#33281a; --src-x:#7fd3cb; --src-x-soft:#16302d; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;margin:0}
-.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:24px 64px}
+.wrap{max-width:1700px;margin:0 auto;padding-inline:20px;padding-block:24px 64px}
 header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:2px solid var(--ink);padding-bottom:14px}
 .brandmark{font-family:var(--display);font-weight:700;font-size:56px;letter-spacing:.06em;line-height:.9;margin:0}
 .brandmark span{color:var(--ember)}
@@ -371,7 +371,7 @@ body.solo .brandgroup>h3 small{display:none}
   <div class="msg"><span class="to">Partner brands · Jordan (TL), Michael (OTX), GU via David</span>Same ask, sent through the brand channel, and the replies go on the board tagged Client so David sees them when he approves.</div>
 </section>
 
-<p class="foot" style="max-width:1180px;margin:0 auto;padding:0 20px 40px">FORGE · live board · verdicts, notes, links and files save to the shared database and reach the Idea Library within the hour.</p>
+<p class="foot" style="max-width:1700px;margin:0 auto;padding:0 20px 40px">FORGE · live board · verdicts, notes, links and files save to the shared database and reach the Idea Library within the hour.</p>
 </div>
 <script>
 const SB = { url:'https://yobtgnpwbqcnvedzrmlh.supabase.co', key:'sb_publishable_aHRdYPgnKxgvM3QSVUqs3Q_8mCqQ3KM',
@@ -537,9 +537,9 @@ function bodyOf(i){
       ${i.what_changed ? `<div><span>What changed</span>${esc(i.what_changed)}</div>` : ''}
     </div>
     ${i.focus_fit ? `<div class="note"><b>Focus fit:</b> ${esc(i.focus_fit)}</div>` : ''}
-    <div class="variants"><div class="variant"><div class="vlab">${esc((adSet(i)[0] || {}).label || 'Static A')} <em>${esc(i.type || '')}</em></div>
+    <div class="variants">${winnerCard(i)}<div class="variant"><div class="vlab">${esc((adSet(i)[0] || {}).label || 'Static A')} <em>${esc(i.type || '')}</em></div>
       <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(NAMES[i.brand] || i.brand)}</b><small>Sponsored · mock ad</small></div></div>
-      ${creative(i)}</div>${adSet(i).slice(1).map((a, k) => adCard(i, a, k + 1)).join('')}${winnerCard(i)}</div>
+      ${creative(i)}</div>${adSet(i).slice(1).map((a, k) => adCard(i, a, k + 1)).join('')}</div>
     <div class="cols">
       ${contentBox(i, appr)}
       ${oscBox(i)}
