@@ -479,7 +479,10 @@ function adCard(i, a, k){
       ${it && it.title ?`<div class="vsub">${esc(it.title)}${a.note ? ' · ' + esc(a.note) : ''}</div>` : ''}</div>`;
 }
 function winnerCard(i){
-  const w = i.mock && i.mock.winner; if (!w || !w.story) return '';
+  const w = i.mock && i.mock.winner; if (!w) return '';
+  if (!w.story) return w.ad_id && w.account ? `<div class="variant winner"><div class="vlab">What it builds on <em class="win">${esc(w.brief || 'original')}</em></div>
+      <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(w.ad || 'The original')}</b><small>Live ad${w.spend ? ' · $' + esc(w.spend) + ' spent' : ''}</small></div></div>
+      <a class="drivelink" href="https://adsmanager.facebook.com/adsmanager/manage/ads?act=${esc(w.account)}&selected_ad_ids=${esc(w.ad_id)}" target="_blank" rel="noopener">Open in Ads Manager ↗</a></div>` : '';
   const [page, post] = String(w.story).split('_');
   const href = w.video_id ? `https://www.facebook.com/${page}/videos/${w.video_id}/` : `https://www.facebook.com/${page}/posts/${post}`;
   const src = w.video_id ? `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(href)}&show_text=0&width=300` : `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(href)}&width=300&show_text=0`;
