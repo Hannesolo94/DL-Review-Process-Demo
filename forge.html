@@ -428,9 +428,15 @@ function pickOf(i){                                            // the content sh
     return { catalog_id:fid, kind:kind === 'video' ? 'video' : 'image', title:title || last.link, drive:last.link, what:'Pasted by ' + last.author, rating:'' }; }
   return (i.mock || {}).pick || null;
 }
+const pinV = n => { const m = /^v(\d+)$/.exec(n.state || ''); return m ? +m[1] : 0; };      // Nov 6: pins belong to one card (Static A = 0)
+function pinsOn(i, v){
+  const all = ideaNotes(i.id).filter(n => n.x != null);
+  const own = all.map((n, k) => [n, k]).filter(([n]) => pinV(n) === v).map(([n, k]) => `<span class="pin" style="left:${n.x}%;top:${n.y}%">${k + 1}</span>`).join('');
+  const pd = pending[i.id], p = pd && (pd.v || 0) === v ? `<span class="pin" style="left:${pd.x}%;top:${pd.y}%;background:var(--steel)">+</span>` : '';
+  return own + p;
+}
 function creative(i){
-  const pins = ideaNotes(i.id).filter(n => n.x != null).map((n, k) => `<span class="pin" style="left:${n.x}%;top:${n.y}%">${k + 1}</span>`).join('');
-  const p = pending[i.id] ? `<span class="pin" style="left:${pending[i.id].x}%;top:${pending[i.id].y}%;background:var(--steel)">+</span>` : '';
+  const pins = pinsOn(i, 0), p = '';
   const isDrive = s => /^[\w-]{20,}$/.test(s || '');
   const pk = pickOf(i), fid = pk ? (pk.src ? 'direct' : (isDrive(pk.catalog_id) ? pk.catalog_id : driveId(pk.drive))) : '';
   let media = '', osc = '';
@@ -471,7 +477,7 @@ function adCard(i, a, k){
   const open = it && it.drive ? `<a class="drivelink" href="${esc(it.drive)}" target="_blank" rel="noopener">Open ↗</a>` : '';
   return `<div class="variant"><div class="vlab">${esc(a.label)} <em>${a.kind === 'video' ? 'video' : 'static'}</em></div>
       <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(NAMES[i.brand] || i.brand)}</b><small>Sponsored · mock ad</small></div></div>
-      <div class="creative ${media ? 'has-media' : ''}" data-id="${esc(i.id)}">${media}<div class="typecard"><div><div class="q">${esc(i.title)}</div><span class="s">${esc(a.label)}<br>${it ? 'Content could not load. Open it in Drive.' : 'No content yet.'}</span></div></div>
+      <div class="creative ${media ? 'has-media' : ''}" data-id="${esc(i.id)}" data-v="${k}" title="Click to drop a pin">${media}${pinsOn(i, k)}<div class="typecard"><div><div class="q">${esc(i.title)}</div><span class="s">${esc(a.label)}<br>${it ? 'Content could not load. Open it in Drive.' : 'No content yet.'}</span></div></div>
         <div class="osc${a.kind === 'video' ? ' onvideo' : ''}"><span class="l1">${esc(line)}</span></div>
         ${a.kind === 'video' ? `<div class="vtag">▶ Video${a.song ? ' · ' + esc(a.song) : ''}</div>` : ''}${open}</div>
       <div class="adfoot"><div class="af-t"><small>${esc((DOMAINS[i.brand] || '').toUpperCase())}</small><b>${esc(line)}</b></div><span class="af-b">Shop now</span></div>
@@ -522,8 +528,8 @@ function bodyOf(i){
   const ns = ideaNotes(i.id), pinned = ns.filter(n => n.x != null);
   const textNotes = ns.filter(n => !n.link && !n.img);
   const noteRows = textNotes.map(n => { const k = n.x != null ? pinned.indexOf(n) + 1 : 0; const mine = whoKey(n.author) === whoKey(viewer);
-    return `<div class="item"><div class="row">${k ? `<span class="pnum">${k}</span>` : ''}<span class="who">${esc(n.author)}${k ? ' · pin' : ''}</span>${mine ? `<button class="x" data-del="${esc(n.id)}" aria-label="Delete note">×</button>` : ''}</div><div>${esc(n.body)}</div></div>`; }).join('');
-  const pend = pending[i.id] ? `<div class="item"><div class="row"><span class="pnum" style="background:var(--steel)">+</span><span class="who">New pin</span><button class="x" data-unpin="${esc(i.id)}" aria-label="Remove pin">×</button></div></div>` : '';
+    return `<div class="item"><div class="row">${k ? `<span class="pnum">${k}</span>` : ''}<span class="who">${esc(n.author)}${k ? ' · pin on ' + esc((adSet(i)[pinV(n)] || {}).label || 'Static A') : ''}</span>${mine ? `<button class="x" data-del="${esc(n.id)}" aria-label="Delete note">×</button>` : ''}</div><div>${esc(n.body)}</div></div>`; }).join('');
+  const pend = pending[i.id] ? `<div class="item"><div class="row"><span class="pnum" style="background:var(--steel)">+</span><span class="who">New pin on ${esc((adSet(i)[(pending[i.id] || {}).v || 0] || {}).label || 'Static A')}</span><button class="x" data-unpin="${esc(i.id)}" aria-label="Remove pin">×</button></div></div>` : '';
   const userLinks = ns.filter(n => n.link).map(n => `<div class="item"><div class="row"><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.link)}</a>${whoKey(n.author) === whoKey(viewer) ? `<button class="x" data-del="${esc(n.id)}" aria-label="Delete link">×</button>` : ''}</div><span class="who">${esc(n.author)}</span>${n.body ? `<div>${esc(n.body)}</div>` : ''}</div>`).join('');
   const files = ns.filter(n => n.img).map(n => `<div class="item"><div class="row"><span class="who">${esc(n.author)}</span>${whoKey(n.author) === whoKey(viewer) ? `<button class="x" data-del="${esc(n.id)}" aria-label="Delete file">×</button>` : ''}</div><img alt="Reference from ${esc(n.author)}" src="${esc(n.img)}">${n.body ? `<div>${esc(n.body)}</div>` : ''}</div>`).join('');
   const vs = verdicts(i.id), mine = vs.find(v => whoKey(v.author) === whoKey(viewer));
@@ -594,8 +600,8 @@ const B = document.getElementById('board');
 B.addEventListener('toggle', e => { const d = e.target; if (!d.matches || !d.matches('details.idea-acc')) return; const id = d.dataset.id;
   if (d.open) { open.add(id); d.querySelector('.acc-body').innerHTML = bodyOf(ideas().find(i => i.id === id)); } else open.delete(id); }, true);
 B.addEventListener('click', async e => {
-  const cr = e.target.closest('.creative');
-  if (cr) { const r = cr.getBoundingClientRect(); pending[cr.dataset.id] = { x:Math.round((e.clientX - r.left) / r.width * 100), y:Math.round((e.clientY - r.top) / r.height * 100) };
+  const cr = e.target.closest('.creative[data-id]');
+  if (cr) { const r = cr.getBoundingClientRect(); pending[cr.dataset.id] = { x:Math.round((e.clientX - r.left) / r.width * 100), y:Math.round((e.clientY - r.top) / r.height * 100), v:+(cr.dataset.v || 0) };
     render(); const ta = document.querySelector(`textarea[data-notebox="${cr.dataset.id}"]`); if (ta) ta.focus(); return; }
   const un = e.target.closest('[data-unpin]'); if (un) { delete pending[un.dataset.unpin]; render(); return; }
   const vb = e.target.closest('button[data-v]');
@@ -614,8 +620,9 @@ B.addEventListener('click', async e => {
   if (an) { if (!viewer && !askName()) return; const iid = an.dataset.addnote, ta = document.querySelector(`textarea[data-notebox="${iid}"]`);
     const body = (ta.value || '').trim(); if (!body) { ta.focus(); return; }
     const p = pending[iid] || {}; const id = uid('fn_'); delete pending[iid];
-    notes.push({ id, kind:'note', asset_id:iid, author:viewer, body, x:p.x, y:p.y }); render();
-    await save({ id, kind:'note', assetId:iid, author:viewer, text:body, x:p.x, y:p.y, round:1 }); return; }
+    const st = p.v ? 'v' + p.v : undefined;
+    notes.push({ id, kind:'note', asset_id:iid, author:viewer, body, x:p.x, y:p.y, state:st }); render();
+    await save({ id, kind:'note', assetId:iid, author:viewer, text:body, x:p.x, y:p.y, state:st, round:1 }); return; }
   const al = e.target.closest('button[data-addlink]');
   if (al) { if (!viewer && !askName()) return; const iid = al.dataset.addlink, u = document.getElementById('lk-' + iid).value.trim(), er = document.getElementById('lke-' + iid);
     if (!/^https?:\/\/\S+\.\S+/.test(u)) { er.textContent = 'Paste a full link that starts with https://'; return; }
