@@ -211,6 +211,7 @@ nav.tabs,.rail,#p-flow,#p-fri,#p-wed{display:none!important}
 .variant .adfoot b{display:block;font:700 13px var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .variant .adfoot .af-b{flex:none;padding:7px 12px;border-radius:6px;background:var(--line);font:700 12px var(--body)}
 .variant .creative{border-radius:0}
+.variant .why{margin:0;padding:8px 12px 8px 26px;font:400 12px/1.4 var(--body);border-top:1px solid var(--line)}.variant .why li{margin:2px 0}
 .variant .vsub{padding:6px 10px;font:400 11px var(--body);color:var(--muted);border-top:1px solid var(--line);overflow-wrap:anywhere}
 .creative .osc .l1{text-wrap:balance}
 .creative .drivelink{position:absolute;right:8px;bottom:8px;font:500 11px var(--mono);background:rgba(0,0,0,.6);color:#fff;padding:3px 8px;border-radius:6px;text-decoration:none;pointer-events:auto}
@@ -470,9 +471,10 @@ function adCard(i, a, k){
   return `<div class="variant"><div class="vlab">${esc(a.label)} <em>${a.kind === 'video' ? 'video' : 'static'}</em></div>
       <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(NAMES[i.brand] || i.brand)}</b><small>Sponsored · mock ad</small></div></div>
       <div class="creative ${media ? 'has-media' : ''}" data-id="${esc(i.id)}">${media}<div class="typecard"><div><div class="q">${esc(i.title)}</div><span class="s">${esc(a.label)}<br>${it ? 'Content could not load. Open it in Drive.' : 'No content yet.'}</span></div></div>
-        <div class="osc${a.kind === 'video' ? ' onvideo' : ''}"><span class="l1">${esc(line)}</span></div>
+        ${it && it.rating === 'Mock' ? '' : `<div class="osc${a.kind === 'video' ? ' onvideo' : ''}"><span class="l1">${esc(line)}</span></div>`}
         ${a.kind === 'video' ? `<div class="vtag">▶ Video${a.song ? ' · ' + esc(a.song) : ''}</div>` : ''}${open}</div>
       <div class="adfoot"><div class="af-t"><small>${esc((DOMAINS[i.brand] || '').toUpperCase())}</small><b>${esc(line)}</b></div><span class="af-b">Shop now</span></div>
+      ${it && it.rating === 'Mock' && it.what ? `<ul class="why">${String(it.what).split(' | ').slice(0, 2).map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
       ${it && it.title ?`<div class="vsub">${esc(it.title)}${a.note ? ' · ' + esc(a.note) : ''}</div>` : ''}</div>`;
 }
 function winnerCard(i){
