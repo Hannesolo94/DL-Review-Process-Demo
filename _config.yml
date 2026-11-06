@@ -1,0 +1,2 @@
+# Nov 6 2026: publish only the pages. Media lives in the private Supabase bucket, never in this repo.
+exclude: [tools, supabase, staging, assets, README.md, "*.py", "*.sql", "*.json", "*.bak*"]

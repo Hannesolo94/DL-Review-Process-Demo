@@ -11,3 +11,17 @@ Thumbs.db
 .oi_client_token
 .atp_tokens
 __pycache__/
+
+# Nov 6 2026: no media or backups in the repo (public)
+*.mp4
+*.mov
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.bak*
+staging/
+assets/
+deleted_note_*.json
+tools/*_before.json
+*.json.bak
