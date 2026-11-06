@@ -465,6 +465,11 @@ function adSet(i){
   const at = k => pool.length ? pool[k % pool.length] : null;
   return [['Static A','static'],['Static B','static'],['Video A','video'],['Video B','video']].map(([label, kind], k) => ({ label, kind, item: at(k) }));
 }
+function staticAFoot(i){          // Nov 6 (Hannes): Static A gets the same ad footer and why-bullets as the other cards
+  const it = pickOf(i), L = oscOf(i), line = L[0] || i.title;
+  return `<div class="adfoot"><div class="af-t"><small>${esc((DOMAINS[i.brand] || '').toUpperCase())}</small><b>${esc(line)}</b></div><span class="af-b">Shop now</span></div>` +
+    (it && it.rating === 'Mock' && it.what ? `<ul class="why">${String(it.what).split(' | ').slice(0, 2).map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : '');
+}
 function adCard(i, a, k){
   const it = a.item || null, isDrive = s => /^[\w-]{20,}$/.test(s || '');
   const fid = it && !it.src ? (isDrive(it.catalog_id) ? it.catalog_id : driveId(it.drive)) : '';
@@ -545,7 +550,7 @@ function bodyOf(i){
     ${i.focus_fit ? `<div class="note"><b>Focus fit:</b> ${esc(i.focus_fit)}</div>` : ''}
     <div class="variants">${winnerCard(i)}<div class="variant"><div class="vlab">${esc((adSet(i)[0] || {}).label || 'Static A')} <em>${esc(i.type || '')}</em></div>
       <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(NAMES[i.brand] || i.brand)}</b><small>Sponsored · mock ad</small></div></div>
-      ${creative(i)}</div>${adSet(i).slice(1).map((a, k) => adCard(i, a, k + 1)).join('')}</div>
+      ${creative(i)}${staticAFoot(i)}</div>${adSet(i).slice(1).map((a, k) => adCard(i, a, k + 1)).join('')}</div>
     <div class="cols">
       ${contentBox(i, appr)}
       ${oscBox(i)}
