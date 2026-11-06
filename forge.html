@@ -464,7 +464,8 @@ function adCard(i, a, k){
   const fid = it && !it.src ? (isDrive(it.catalog_id) ? it.catalog_id : driveId(it.drive)) : '';
   const L = oscOf(i), line = a.line || (/ B$/.test(a.label) ? L[1] : L[0]) || i.title;
   let media = '';
-  if (it && it.src) media = `<img src="${esc(it.src)}" alt="${esc(it.title || '')}" loading="lazy" onerror="mockErr(this)" style="object-fit:contain;background:#fff">`;
+  if (it && it.src && it.kind === 'video') media = `<video src="${esc(it.src)}" muted loop autoplay playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;background:#000"></video>`;   // Nov 6: Remotion video mocks from our own storage
+  else if (it && it.src) media = `<img src="${esc(it.src)}" alt="${esc(it.title || '')}" loading="lazy" onerror="mockErr(this)" style="object-fit:contain;background:#fff">`;
   else if (fid && it.kind === 'video') media = `<iframe src="${esc(VID(fid))}" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="${esc(it.title || 'Video')}"></iframe>`;
   else if (fid) media = `<img src="${esc(IMG(fid))}" data-alt="${esc(IMG2(fid))}" alt="${esc(it.title || '')}" loading="lazy" onerror="mockErr(this)">`;
   const open = it && it.drive ? `<a class="drivelink" href="${esc(it.drive)}" target="_blank" rel="noopener">Open ↗</a>` : '';
