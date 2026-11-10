@@ -62,6 +62,7 @@ nav.tabs button:focus-visible,button:focus-visible,textarea:focus-visible{outlin
 .ad-head .who{min-width:0}
 .ad-head .who b{display:block;font-size:14px}
 .ad-head .who small{color:var(--muted);font-size:12px}
+.ptext{padding:0 14px 10px;font-size:14px;line-height:1.45;white-space:pre-wrap}   /* Nov 10: whitelisted UGC, the post's primary copy */
 .ad-copy{padding:0 14px 10px;font-size:14px}
 .creative{position:relative;aspect-ratio:4/5;max-width:100%;background:var(--steel);overflow:hidden}
 .creative img{width:100%;height:100%;object-fit:cover;display:block}
@@ -442,18 +443,21 @@ function creative(i){
   let media = '', osc = '';
   const L = oscOf(i); const lines = L.length ? `<span class="opts">${L.map((l, k) => `<span>${String.fromCharCode(65 + k)}: ${esc(l)}</span>`).join('')}</span>` : '';
   const ext = pk && !fid && pk.drive ? (/dropbox\.com/.test(pk.drive) ? 'Dropbox' : 'the source') : '';
-  if (pk && pk.src) { media = `<img src="${esc(pk.src)}" alt="${esc(pk.title || '')}" loading="lazy" onerror="mockErr(this)" style="object-fit:contain;background:#fff">`;
+  if (pk && pk.src && pk.kind === 'video') { media = `<video src="${esc(pk.src)}" controls playsinline preload="metadata" style="width:100%;height:100%;object-fit:contain;background:#000"></video>`; }   // Nov 10: UGC videos with sound
+  else if (pk && pk.src) { media = `<img src="${esc(pk.src)}" alt="${esc(pk.title || '')}" loading="lazy" onerror="mockErr(this)" style="object-fit:contain;background:#fff">`;
     osc = `<div class="osc"><span class="l1">${esc(i.title)}</span>${lines}</div>`; }
   else if (fid && pk.kind === 'video') { media = `<iframe src="${esc(VID(fid))}" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="${esc(pk.title || 'Video from the brand drive')}"></iframe>`;
     osc = `<div class="osc onvideo"><span class="l1">${esc(i.title)}</span>${lines}</div>`; }
   else if (fid) { media = `<img src="${esc(IMG(fid))}" data-alt="${esc(IMG2(fid))}" alt="${esc(pk.title || '')}" loading="lazy" onerror="mockErr(this)">`;
     osc = `<div class="osc"><span class="l1">${esc(i.title)}</span>${lines}</div>`; }
+  if ((i.mock || {}).nooverlay) osc = '';
+  else if (((i.mock || {}).ads || [])[0] && i.mock.ads[0].line) osc = `<div class="osc"><span class="l1">${esc(i.mock.ads[0].line)}</span></div>`;   // Nov 10: the card's own on-screen line
   const fallback = fid ? 'Content could not load. Sign in to Google with your dlmedia.org account, or open it in Drive.' : ext ? `${esc(pk.title)} · this file sits on ${ext}, which cannot show inside the card. Open it there.` : 'Mock ad · no catalogued content matched yet, pick one below';
   return `<div class="creative ${fid ? 'has-media' : ''}" data-id="${esc(i.id)}" title="${pk && pk.kind === 'video' ? 'Video plays here' : 'Click to drop a pin'}">${media}<div class="typecard"><div>
       <div class="q">${esc(i.title)}</div><span class="s">${esc(i.type || '')}${i.persona ? ' · ' + esc(i.persona) : ''}<br>${esc(fallback)}</span></div></div>${osc}${pins}${p}
       ${(i.mock && i.mock.comments && i.mock.comments.length && fid) ? `<div class="bubbles">${i.mock.comments.slice(0, 3).map(c => `<div class="bubble"><b>Commenter</b>${esc(c)}</div>`).join('')}</div>` : ''}
       ${(!fid && !ext && i.mock && i.mock.note) ? `<div class="cnote">${esc(i.mock.note)}</div>` : ''}
-      ${fid ? `<a class="drivelink" href="${esc(pk.drive)}" target="_blank" rel="noopener">${pk.src ? 'Open product' : 'Open in Drive'} ↗</a>` : ext ? `<a class="drivelink" href="${esc(pk.drive)}" target="_blank" rel="noopener">Open in ${esc(ext)} ↗</a>` : ''}</div>`;
+      ${fid ? `<a class="drivelink" href="${esc(pk.drive)}" target="_blank" rel="noopener">${pk.src && pk.kind !== 'video' ? 'Open product' : 'Open in Drive'} ↗</a>` : ext ? `<a class="drivelink" href="${esc(pk.drive)}" target="_blank" rel="noopener">Open in ${esc(ext)} ↗</a>` : ''}</div>`;
 }
 // Oct 26 2026 (Hannes): "for all add a A/B static and a A/B video" + "make this preview the standard".
 // Static A is the main ad (pins, content swaps). The other three come from mock.ads when the builder set them,
@@ -465,8 +469,13 @@ function adSet(i){
   const at = k => pool.length ? pool[k % pool.length] : null;
   return [['Static A','static'],['Static B','static'],['Video A','video'],['Video B','video']].map(([label, kind], k) => ({ label, kind, item: at(k) }));
 }
+function adHead(i, a){          // Nov 10 (OTX UGC): a whitelisted ad shows the creator's page and the primary copy above the creative
+  const m = i.mock || {}, prim = (a && a.primary != null) ? a.primary : m.primary;
+  const who = m.page ? `<b>${esc(m.page)}</b><small>Sponsored · paid partnership with ${esc(NAMES[i.brand] || i.brand)}</small>` : `<b>${esc(NAMES[i.brand] || i.brand)}</b><small>Sponsored · mock ad</small>`;
+  return `<div class="ad-head"><div class="av">${esc(m.page ? m.page.slice(0, 2).toUpperCase() : i.brand)}</div><div class="who">${who}</div></div>` + (prim ? `<div class="ptext">${esc(prim)}</div>` : '');
+}
 function staticAFoot(i){          // Nov 6 (Hannes): Static A gets the same ad footer and why-bullets as the other cards
-  const it = pickOf(i), L = oscOf(i), line = L[0] || i.title;
+  const it = pickOf(i), L = oscOf(i), m = i.mock || {}, line = m.headline != null ? m.headline : (L[0] || i.title);   // Nov 10: the Meta headline when the board sets one
   return `<div class="adfoot"><div class="af-t"><small>${esc((DOMAINS[i.brand] || '').toUpperCase())}</small><b>${esc(line)}</b></div><span class="af-b">Shop now</span></div>` +
     (it && it.rating === 'Mock' && it.what ? `<ul class="why">${String(it.what).split(' | ').slice(0, 2).map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : '');
 }
@@ -475,17 +484,17 @@ function adCard(i, a, k){
   const fid = it && !it.src ? (isDrive(it.catalog_id) ? it.catalog_id : driveId(it.drive)) : '';
   const L = oscOf(i), line = a.line || (/ B$/.test(a.label) ? L[1] : L[0]) || i.title;
   let media = '';
-  if (it && it.src && it.kind === 'video') media = `<video src="${esc(it.src)}" muted loop autoplay playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;background:#000"></video>`;   // Nov 6: Remotion video mocks from our own storage
+  if (it && it.src && it.kind === 'video') media = `<video src="${esc(it.src)}" muted loop autoplay playsinline preload="metadata"${(i.mock || {}).nooverlay ? ' controls' : ''} style="width:100%;height:100%;object-fit:cover;background:#000"></video>`;   // Nov 6: Remotion video mocks from our own storage
   else if (it && it.src) media = `<img src="${esc(it.src)}" alt="${esc(it.title || '')}" loading="lazy" onerror="mockErr(this)" style="object-fit:contain;background:#fff">`;
   else if (fid && it.kind === 'video') media = `<iframe src="${esc(VID(fid))}" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="${esc(it.title || 'Video')}"></iframe>`;
   else if (fid) media = `<img src="${esc(IMG(fid))}" data-alt="${esc(IMG2(fid))}" alt="${esc(it.title || '')}" loading="lazy" onerror="mockErr(this)">`;
   const open = it && it.drive ? `<a class="drivelink" href="${esc(it.drive)}" target="_blank" rel="noopener">Open ↗</a>` : '';
   return `<div class="variant"><div class="vlab">${esc(a.label)} <em>${a.kind === 'video' ? 'video' : 'static'}</em></div>
-      <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(NAMES[i.brand] || i.brand)}</b><small>Sponsored · mock ad</small></div></div>
+      ${adHead(i, a)}
       <div class="creative ${media ? 'has-media' : ''}" data-id="${esc(i.id)}" data-v="${k}" title="Click to drop a pin">${media}${pinsOn(i, k)}<div class="typecard"><div><div class="q">${esc(i.title)}</div><span class="s">${esc(a.label)}<br>${it ? 'Content could not load. Open it in Drive.' : 'No content yet.'}</span></div></div>
-        <div class="osc${a.kind === 'video' ? ' onvideo' : ''}"><span class="l1">${esc(line)}</span></div>
+        ${(i.mock || {}).nooverlay ? '' : `<div class="osc${a.kind === 'video' ? ' onvideo' : ''}"><span class="l1">${esc(line)}</span></div>`}
         ${a.kind === 'video' ? `<div class="vtag">▶ Video${a.song ? ' · ' + esc(a.song) : ''}</div>` : ''}${open}</div>
-      <div class="adfoot"><div class="af-t"><small>${esc((DOMAINS[i.brand] || '').toUpperCase())}</small><b>${esc(line)}</b></div><span class="af-b">Shop now</span></div>
+      <div class="adfoot"><div class="af-t"><small>${esc((DOMAINS[i.brand] || '').toUpperCase())}</small><b>${esc((i.mock || {}).headline != null ? i.mock.headline : line)}</b></div><span class="af-b">Shop now</span></div>
       ${it && it.rating === 'Mock' && it.what ? `<ul class="why">${String(it.what).split(' | ').slice(0, 2).map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
       ${it && it.title ?`<div class="vsub">${esc(it.title)}${a.note ? ' · ' + esc(a.note) : ''}</div>` : ''}</div>`;
 }
@@ -549,7 +558,7 @@ function bodyOf(i){
     </div>
     ${i.focus_fit ? `<div class="note"><b>Focus fit:</b> ${esc(i.focus_fit)}</div>` : ''}
     <div class="variants">${winnerCard(i)}<div class="variant"><div class="vlab">${esc((adSet(i)[0] || {}).label || 'Static A')} <em>${esc(i.type || '')}</em></div>
-      <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(NAMES[i.brand] || i.brand)}</b><small>Sponsored · mock ad</small></div></div>
+      ${adHead(i)}
       ${creative(i)}${staticAFoot(i)}</div>${adSet(i).slice(1).map((a, k) => adCard(i, a, k + 1)).join('')}</div>
     <div class="cols">
       ${contentBox(i, appr)}
@@ -557,7 +566,7 @@ function bodyOf(i){
       <div class="box"><h4>Notes <small>${textNotes.length}</small></h4>${noteRows}${pend}${!noteRows && !pend ? '<span class="hint">Click the ad to pin a note, or write a general one.</span>' : ''}
         <div class="add"><textarea data-notebox="${esc(i.id)}" placeholder="${pending[i.id] ? 'Note for the new pin' : 'Write a note'}"></textarea><button data-addnote="${esc(i.id)}" type="button">${pending[i.id] ? 'Save pin note' : 'Add note'}</button></div></div>
       <div class="box"><h4>Links <small>${1 + (/comment bank/i.test([i.data, i.why, i.how, i.title].join(' ')) ? 1 : 0) + ns.filter(n => n.link).length}</small></h4>
-        <div class="item"><a href="${esc(i.url)}" target="_blank" rel="noopener">This idea in the Idea Library</a><span class="who">Added by FORGE</span></div>
+        ${i.url ? `<div class="item"><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.url_label || 'This idea in the Idea Library')}</a><span class="who">Added by FORGE</span></div>` : ''}
         ${/comment bank/i.test([i.data, i.why, i.how, i.title].join(' ')) ? `<div class="item"><a href="https://app.notion.com/p/1d4be3b747244d93a5d68dd0000e445a" target="_blank" rel="noopener">Comment Bank (real comments from the brand's posts)</a><span class="who">Source of this idea · Added by FORGE</span></div>` : ''}${userLinks}
         <div class="add"><label class="small" for="lk-${esc(i.id)}">Paste a link</label><input type="url" id="lk-${esc(i.id)}" placeholder="https://"><input type="text" id="lkn-${esc(i.id)}" placeholder="Note on this link (optional)"><div class="err" id="lke-${esc(i.id)}" role="alert"></div><button data-addlink="${esc(i.id)}" type="button">Add link</button></div></div>
       <div class="box"><h4>Files <small>${ns.filter(n => n.img).length}</small></h4>${files || '<span class="hint">Reference images: a photo, a frame, a screenshot. Up to 300 KB each.</span>'}
