@@ -63,7 +63,7 @@
 <div class="done"><button class="btn" id="doneBtn">I'm done reviewing</button></div>
 <div class="status" id="status"></div>
 <script>
-const SB = { url:'https://yobtgnpwbqcnvedzrmlh.supabase.co', key:'sb_publishable_aHRdYPgnKxgvM3QSVUqs3Q_8mCqQ3KM',
+const SB = { url:'https://owxhmgqpcpkyiybsxipl.supabase.co', key:'sb_publishable_h21XYNmQH0cXuGRp3yc1jQ_DjslVfPG',
   async rpc(fn, body){ const r = await fetch(this.url + '/rest/v1/rpc/' + fn, { method:'POST',
       headers:{ apikey:this.key, Authorization:'Bearer ' + this.key, 'Content-Type':'application/json' }, body:JSON.stringify(body) });
     const t = await r.text(); if (!r.ok) throw new Error(t || ('HTTP ' + r.status)); return t ? JSON.parse(t) : null; } };

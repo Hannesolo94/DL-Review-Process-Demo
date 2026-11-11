@@ -415,6 +415,9 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 .general .gnote textarea{margin:0 0 12px;resize:vertical}
 .general .gnote .row{justify-content:space-between}
 .general .gnote .status{font-size:12px;color:var(--faint)}
+.frame iframe.dvid{display:block;width:100%;border:0;background:#000}
+.frame .archived{padding:48px 16px;text-align:center;color:#6b6b6b;font-size:13px;background:#f3f3f3}
+.vtime{width:64px;font:inherit;padding:2px 6px;border:1px solid #ccc;border-radius:6px}
 </style>
 
 <div class="bar">
@@ -534,6 +537,18 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 
 <script>
 let ASSETS = [];
+/* Nov 11 2026 (Hannes, HARD RULE): media is never stored in Supabase. Every ad shows straight from its Google Drive file:
+   images through Drive's thumbnail, videos through Drive's own player. Old copies in the retired store show as archived. */
+function driveify(a){
+  a = Object.assign({}, a);
+  if (a.drive){
+    if (a.kind === 'image') a.src = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(a.drive) + '&sz=w2000';
+    else { a.dsrc = 'https://drive.google.com/file/d/' + encodeURIComponent(a.drive) + '/preview'; a.src = ''; }
+  } else if (a.src && /yobtgnpwbqcnvedzrmlh\.supabase\.co/.test(a.src)){ a.src = ''; a.archived = true; }
+  return a;
+}
+function ratioOf(spec){ const m = /(\d+)\s*[:x]\s*(\d+)/.exec(spec || ''); return m ? m[1] + '/' + m[2] : '9/16'; }
+function mmssToSec(t){ const m = /^(\d+):(\d{1,2})$/.exec((t || '').trim()); return m ? (+m[1]) * 60 + (+m[2]) : (+(t || '').trim() || 0); }
 const ROUNDS = [{ n:1, label:'Round 1', live:true }];
 let BRAND = { name:'', initials:'', domain:'', cta:'Shop now' };
 let COPY = { headline:'', primary:'' };
@@ -545,8 +560,8 @@ function assetCopy(a){
 
 /* ---- Supabase, used when the link carries a brief token ---- */
 const SB = {
-  url: 'https://yobtgnpwbqcnvedzrmlh.supabase.co',
-  key: 'sb_publishable_aHRdYPgnKxgvM3QSVUqs3Q_8mCqQ3KM',
+  url: 'https://owxhmgqpcpkyiybsxipl.supabase.co',   /* Nov 11 2026: new DL Media CRAFT project; the old one was locked for stored media */
+  key: 'sb_publishable_h21XYNmQH0cXuGRp3yc1jQ_DjslVfPG',
   async rpc(fn, body){
     const r = await fetch(this.url + '/rest/v1/rpc/' + fn, {
       method:'POST',
@@ -642,7 +657,7 @@ async function boot(){
         return;
       }
       const d = b.data || {};
-      if (d.assets && d.assets.length) ASSETS = d.assets;
+      if (d.assets && d.assets.length) ASSETS = d.assets.map(driveify);
       if (d.brand) BRAND = d.brand;
       if (d.copy)  COPY  = d.copy;
       CLIENT_COPY = !!d.clientCopy; VL = d.verdictLabels || {}; PREV = { label: d.prevLabel, general: d.prevGeneral }; TYPE_NOTES = !!d.typeNotes;   /* Oct 30: a type-in note box under every static */   /* Oct 29: per page button words, e.g. Run it / Don't run */
@@ -1084,7 +1099,10 @@ function drawAssets(){
           '<div class="row"><button class="btn" type="button" data-tn="' + a.id + '">Leave note</button><span class="status">Enter to save, Shift + Enter for a new line</span></div></div>' : '') +
       (a.kind === 'video' && a.src
         ? '<div class="vbar"><button class="btn" type="button" id="vt-' + a.id + '">Note this moment</button>' +
-          '<span class="vnow">at <b id="vn-' + a.id + '">0:00</b></span></div>' : '') +
+          '<span class="vnow">at <b id="vn-' + a.id + '">0:00</b></span></div>'
+        : a.kind === 'video' && a.drive
+        ? '<div class="vbar"><button class="btn" type="button" id="vt-' + a.id + '">Note this moment</button>' +
+          '<span class="vnow">at <input class="vtime" id="vx-' + a.id + '" placeholder="0:12" inputmode="numeric" aria-label="Time in the video"></span></div>' : '') +
       '<div class="lower" id="l-' + a.id + '">' +
         '<div class="notes" id="n-' + a.id + '"></div>' +
         '<div class="composer" id="k-' + a.id + '" hidden></div>' +
@@ -1404,9 +1422,12 @@ function drawPreviews(){
     const el = document.getElementById('p-' + a.id);
     if (!el || el.dataset.built) return;
     const media = '<div class="frame" data-asset="' + a.id + '" data-kind="' + a.kind + '">' +
-      (a.kind === 'image'
-        ? '<img src="' + a.src + '" alt="' + esc(a.title) + ' in a feed post">'
-        : (a.src ? '<video src="' + a.src + '" controls playsinline preload="metadata"></video>' : '')) +
+      (a.archived || (!a.src && !a.dsrc)
+        ? '<div class="archived">Media archived. The file is in the brief&#39;s Drive folder.</div>'
+        : a.kind === 'image'
+        ? '<img src="' + a.src + '" alt="' + esc(a.title) + ' in a feed post" referrerpolicy="no-referrer">'
+        : a.dsrc ? '<iframe class="dvid" src="' + a.dsrc + '" style="aspect-ratio:' + ratioOf(a.spec) + '" allow="autoplay; fullscreen" allowfullscreen title="' + esc(a.title) + '"></iframe>'
+        : '<video src="' + a.src + '" controls playsinline preload="metadata"></video>') +
       '<button class="zoom" type="button" data-big="' + a.id + '" title="Open larger">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
         'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
@@ -1425,6 +1446,10 @@ function drawPreviews(){
           '<div class="h"></div></div><span class="post-cta">' + esc(BRAND.cta) + '</span></div>' +
       '</div>';
     el.dataset.built = '1';
+    if (a.kind === 'video' && !a.src && a.drive){   /* Drive's player can't tell us the time, so the reviewer types it */
+      const btn = document.getElementById('vt-' + a.id);
+      if (btn) btn.onclick = () => { const x = document.getElementById('vx-' + a.id); openDraft(a, { t: mmssToSec(x && x.value) }); };
+    }
     if (a.kind === 'video' && a.src){
       const v = el.querySelector('video');
       const nowEl = document.getElementById('vn-' + a.id);

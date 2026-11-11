@@ -25,3 +25,6 @@ assets/
 deleted_note_*.json
 tools/*_before.json
 *.json.bak
+
+.dbpass
+.dsn_new
