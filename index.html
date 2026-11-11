@@ -424,6 +424,7 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 .modal-body .frame.rbox{width:min(100%, calc((100dvh - 210px) * var(--r, 1)))}
 .modal-body .frame.rbox img,.modal-body .frame.rbox video{max-height:none}
 .frame[data-kind="video"] .zoom{opacity:1}
+.noaccess{aspect-ratio:var(--r,4/5);width:100%;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;text-align:center;padding:24px;background:#f3f1ec;color:#333;font:14px/1.45 system-ui,sans-serif}.noaccess b{font-size:15px}.noaccess a{color:#1a5fd0;font-weight:600}
 </style>
 
 <div class="bar">
@@ -553,6 +554,13 @@ function driveify(a){
   } else if (a.src && /yobtgnpwbqcnvedzrmlh\.supabase\.co/.test(a.src)){ a.src = ''; a.archived = true; }
   return a;
 }
+/* Nov 11 2026: Drive files only show to a Google account with access, and lh3 uses the browser's FIRST account. Try the next two
+   signed-in accounts, then say plainly what is wrong instead of a broken image. */
+function crNoAccess(img){ const n = +(img.dataset.au || 0), id = img.dataset.drive; if (!id) return;
+  if (n < 2) { img.dataset.au = n + 1; img.src = 'https://lh3.googleusercontent.com/d/' + encodeURIComponent(id) + '=w2000?authuser=' + (n + 1); return; }
+  const b = document.createElement('div'); b.className = 'noaccess';
+  b.innerHTML = '<b>Can’t show this ad here</b><span>It lives in Google Drive and this browser isn’t signed in to a Google account that can see it.</span><a href="https://drive.google.com/file/d/' + encodeURIComponent(id) + '/view" target="_blank" rel="noopener">Open it in Drive</a>';
+  img.replaceWith(b); }
 function crRatio(img){ const f = img.parentNode; if (f && !f.style.getPropertyValue('--r') && img.naturalHeight) f.style.setProperty('--r', (img.naturalWidth / img.naturalHeight).toFixed(4)); }   /* images with no ratio in the spec take their own shape */
 function ratioNum(spec){ const m = /(\d+)\s*[:x]\s*(\d+)/.exec(spec || ''); if (!m) return null; const w = +m[1], h = +m[2]; return (w > 0 && h > 0 && w < 50 && h < 50) ? w / h : null; }   /* 1:1, 4:5, 9:16 from the spec; pixel sizes (1080x1920) are skipped */
 function ratioOf(spec){ const m = /(\d+)\s*[:x]\s*(\d+)/.exec(spec || ''); return m ? m[1] + '/' + m[2] : '9/16'; }
@@ -1436,7 +1444,7 @@ function drawPreviews(){
       (a.archived || (!a.src && !a.dsrc)
         ? '<div class="archived">Media archived. The file is in the brief&#39;s Drive folder.</div>'
         : a.kind === 'image'
-        ? '<img src="' + a.src + '" alt="' + esc(a.title) + ' in a feed post" referrerpolicy="no-referrer" onload="crRatio(this)">'
+        ? '<img src="' + a.src + '" alt="' + esc(a.title) + ' in a feed post" referrerpolicy="no-referrer" onload="crRatio(this)"' + (a.drive ? ' data-drive="' + esc(a.drive) + '" onerror="crNoAccess(this)"' : '') + '>'
         : a.dsrc ? '<iframe class="dvid" src="' + a.dsrc + '" allow="autoplay; fullscreen" allowfullscreen title="' + esc(a.title) + '"></iframe>'
         : '<video src="' + a.src + '" controls playsinline preload="metadata"></video>') +
       '<button class="zoom" type="button" data-big="' + a.id + '" title="Open larger">' +
