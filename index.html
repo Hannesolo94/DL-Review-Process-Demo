@@ -418,6 +418,12 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 .frame iframe.dvid{display:block;width:100%;border:0;background:#000}
 .frame .archived{padding:48px 16px;text-align:center;color:#6b6b6b;font-size:13px;background:#f3f3f3}
 .vtime{width:64px;font:inherit;padding:2px 6px;border:1px solid #ccc;border-radius:6px}
+.frame.rbox{display:block;margin:0 auto;width:min(100%, calc(430px * var(--r, 1)));aspect-ratio:var(--r, auto);background:#0b0b0b}
+.frame.rbox:not([style]){width:auto;aspect-ratio:auto}
+.frame.rbox img,.frame.rbox iframe,.frame.rbox video{width:100%;height:100%;max-height:none;object-fit:contain}
+.modal-body .frame.rbox{width:min(100%, calc((100dvh - 210px) * var(--r, 1)))}
+.modal-body .frame.rbox img,.modal-body .frame.rbox video{max-height:none}
+.frame[data-kind="video"] .zoom{opacity:1}
 </style>
 
 <div class="bar">
@@ -547,6 +553,8 @@ function driveify(a){
   } else if (a.src && /yobtgnpwbqcnvedzrmlh\.supabase\.co/.test(a.src)){ a.src = ''; a.archived = true; }
   return a;
 }
+function crRatio(img){ const f = img.parentNode; if (f && !f.style.getPropertyValue('--r') && img.naturalHeight) f.style.setProperty('--r', (img.naturalWidth / img.naturalHeight).toFixed(4)); }   /* images with no ratio in the spec take their own shape */
+function ratioNum(spec){ const m = /(\d+)\s*[:x]\s*(\d+)/.exec(spec || ''); if (!m) return null; const w = +m[1], h = +m[2]; return (w > 0 && h > 0 && w < 50 && h < 50) ? w / h : null; }   /* 1:1, 4:5, 9:16 from the spec; pixel sizes (1080x1920) are skipped */
 function ratioOf(spec){ const m = /(\d+)\s*[:x]\s*(\d+)/.exec(spec || ''); return m ? m[1] + '/' + m[2] : '9/16'; }
 function mmssToSec(t){ const m = /^(\d+):(\d{1,2})$/.exec((t || '').trim()); return m ? (+m[1]) * 60 + (+m[2]) : (+(t || '').trim() || 0); }
 const ROUNDS = [{ n:1, label:'Round 1', live:true }];
@@ -1099,10 +1107,12 @@ function drawAssets(){
           '<div class="row"><button class="btn" type="button" data-tn="' + a.id + '">Leave note</button><span class="status">Enter to save, Shift + Enter for a new line</span></div></div>' : '') +
       (a.kind === 'video' && a.src
         ? '<div class="vbar"><button class="btn" type="button" id="vt-' + a.id + '">Note this moment</button>' +
-          '<span class="vnow">at <b id="vn-' + a.id + '">0:00</b></span></div>'
+          '<span class="vnow">at <b id="vn-' + a.id + '">0:00</b></span>' +
+          '<button class="btn" type="button" data-fs="' + a.id + '">Full screen</button></div>'
         : a.kind === 'video' && a.drive
         ? '<div class="vbar"><button class="btn" type="button" id="vt-' + a.id + '">Note this moment</button>' +
-          '<span class="vnow">at <input class="vtime" id="vx-' + a.id + '" placeholder="0:12" inputmode="numeric" aria-label="Time in the video"></span></div>' : '') +
+          '<span class="vnow">at <input class="vtime" id="vx-' + a.id + '" placeholder="0:12" inputmode="numeric" aria-label="Time in the video"></span>' +
+          '<button class="btn" type="button" data-fs="' + a.id + '">Full screen</button></div>' : '') +
       '<div class="lower" id="l-' + a.id + '">' +
         '<div class="notes" id="n-' + a.id + '"></div>' +
         '<div class="composer" id="k-' + a.id + '" hidden></div>' +
@@ -1421,12 +1431,13 @@ function drawPreviews(){
   ASSETS.forEach(a => {
     const el = document.getElementById('p-' + a.id);
     if (!el || el.dataset.built) return;
-    const media = '<div class="frame" data-asset="' + a.id + '" data-kind="' + a.kind + '">' +
+    const R = ratioNum(a.spec) || (a.kind === 'video' ? 9 / 16 : null);   /* Nov 11 (Hannes): every card takes the ad's own shape */
+    const media = '<div class="frame rbox" data-asset="' + a.id + '" data-kind="' + a.kind + '"' + (R ? ' style="--r:' + R.toFixed(4) + '"' : '') + '>' +
       (a.archived || (!a.src && !a.dsrc)
         ? '<div class="archived">Media archived. The file is in the brief&#39;s Drive folder.</div>'
         : a.kind === 'image'
-        ? '<img src="' + a.src + '" alt="' + esc(a.title) + ' in a feed post" referrerpolicy="no-referrer">'
-        : a.dsrc ? '<iframe class="dvid" src="' + a.dsrc + '" style="aspect-ratio:' + ratioOf(a.spec) + '" allow="autoplay; fullscreen" allowfullscreen title="' + esc(a.title) + '"></iframe>'
+        ? '<img src="' + a.src + '" alt="' + esc(a.title) + ' in a feed post" referrerpolicy="no-referrer" onload="crRatio(this)">'
+        : a.dsrc ? '<iframe class="dvid" src="' + a.dsrc + '" allow="autoplay; fullscreen" allowfullscreen title="' + esc(a.title) + '"></iframe>'
         : '<video src="' + a.src + '" controls playsinline preload="metadata"></video>') +
       '<button class="zoom" type="button" data-big="' + a.id + '" title="Open larger">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
@@ -1462,6 +1473,15 @@ function drawPreviews(){
   });
   syncPreview();
 }
+
+/* ---- full screen for videos (Drive player or our own) ---- */
+document.addEventListener('click', ev => {
+  const b = ev.target.closest && ev.target.closest('[data-fs]'); if (!b) return;
+  const p = document.getElementById('p-' + b.dataset.fs), m = p && p.querySelector('.frame iframe, .frame video');
+  if (!m) return;
+  const go = m.requestFullscreen || m.webkitRequestFullscreen || m.webkitEnterFullscreen;
+  if (go) { try { const r = go.call(m); if (r && r.catch) r.catch(() => openBig(b.dataset.fs)); } catch (_) { openBig(b.dataset.fs); } } else openBig(b.dataset.fs);
+});
 
 /* ---- pin by clicking the creative, in the card or expanded ---- */
 document.addEventListener('click', ev => {

@@ -230,6 +230,9 @@ body.solo .idea-acc>summary{pointer-events:none}
 body.solo .brandgroup>h3 small{display:none}
 .decide .route .state{display:inline-block;margin:6px 4px 0 0}
 @media (max-width:520px){.throwrow{grid-template-columns:1fr}.variant{flex-basis:260px}}
+.creative{aspect-ratio:var(--r, 4/5)}
+.creative img{object-fit:contain;background:#0b0b0b}
+.creative .fsbtn{position:absolute;left:8px;bottom:8px;z-index:4;font:600 11px var(--mono);background:rgba(0,0,0,.65);color:#fff;border:0;border-radius:6px;padding:4px 9px;cursor:pointer}
 </style></head><body>
 <div class="wrap">
 <header class="top">
@@ -387,6 +390,11 @@ const driveId = u => { const m = /\/d\/([\w-]{20,})|[?&]id=([\w-]{20,})/.exec(u 
 const IMG = id => 'https://lh3.googleusercontent.com/d/' + id + '=w900';
 const IMG2 = id => 'https://drive.google.com/thumbnail?id=' + id + '&sz=w900';
 const VID = id => 'https://drive.google.com/file/d/' + id + '/preview';
+// Nov 11 2026 (Hannes): every card takes its ad's own shape (1:1, 4:5, 9:16), never cropped. Videos default to 9:16, photos take their own size when they load.
+const fxNum = s => { const m = /(\d+)\s*[:x\/]\s*(\d+)/.exec(s || ''); if (!m) return null; const w = +m[1], h = +m[2]; return (w > 0 && h > 0 && w < 50 && h < 50) ? w / h : null; };
+const fxR = it => { if (!it) return ''; const r = fxNum(it.ratio) || fxNum(it.spec) || fxNum(it.format) || (it.kind === 'video' ? 9 / 16 : null); return r ? ` style="--r:${r.toFixed(4)}"` : ''; };
+window.fxImg = img => { const c = img.closest('.creative'); if (c && !c.style.getPropertyValue('--r') && img.naturalHeight) c.style.setProperty('--r', (img.naturalWidth / img.naturalHeight).toFixed(4)); };
+window.fxFull = btn => { const c = btn.closest('.creative'), m = c && c.querySelector('iframe, video'); if (!m) return; const go = m.requestFullscreen || m.webkitRequestFullscreen || m.webkitEnterFullscreen; if (go) { const r = go.call(m); if (r && r.catch) r.catch(() => window.open(m.src, '_blank')); } else window.open(m.src, '_blank'); };
 window.mockErr = img => { if (img.dataset.alt) { img.src = img.dataset.alt; img.dataset.alt = ''; return; }
   const c = img.closest('.creative'); if (c) { c.classList.remove('has-media'); c.classList.add('no-media'); } img.remove(); };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -446,16 +454,16 @@ function creative(i){
   const L = oscOf(i); const lines = L.length ? `<span class="opts">${L.map((l, k) => `<span>${String.fromCharCode(65 + k)}: ${esc(l)}</span>`).join('')}</span>` : '';
   const ext = pk && !fid && pk.drive ? (/dropbox\.com/.test(pk.drive) ? 'Dropbox' : 'the source') : '';
   if (pk && pk.src && pk.kind === 'video') { media = `<video src="${esc(pk.src)}" controls playsinline preload="metadata" style="width:100%;height:100%;object-fit:contain;background:#000"></video>`; }   // Nov 10: UGC videos with sound
-  else if (pk && pk.src) { media = `<img src="${esc(pk.src)}" alt="${esc(pk.title || '')}" loading="lazy" onerror="mockErr(this)" style="object-fit:contain;background:#fff">`;
+  else if (pk && pk.src) { media = `<img src="${esc(pk.src)}" alt="${esc(pk.title || '')}" loading="lazy" onload="fxImg(this)" onerror="mockErr(this)" style="object-fit:contain;background:#fff">`;
     osc = `<div class="osc"><span class="l1">${esc(i.title)}</span>${lines}</div>`; }
-  else if (fid && pk.kind === 'video') { media = `<iframe src="${esc(VID(fid))}" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="${esc(pk.title || 'Video from the brand drive')}"></iframe>`;
+  else if (fid && pk.kind === 'video') { media = `<iframe src="${esc(VID(fid))}" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="${esc(pk.title || 'Video from the brand drive')}"></iframe><button type="button" class="fsbtn" onclick="event.stopPropagation();fxFull(this)">⛶ Full screen</button>`;
     osc = `<div class="osc onvideo"><span class="l1">${esc(i.title)}</span>${lines}</div>`; }
-  else if (fid) { media = `<img src="${esc(IMG(fid))}" data-alt="${esc(IMG2(fid))}" alt="${esc(pk.title || '')}" loading="lazy" onerror="mockErr(this)">`;
+  else if (fid) { media = `<img src="${esc(IMG(fid))}" data-alt="${esc(IMG2(fid))}" alt="${esc(pk.title || '')}" loading="lazy" onload="fxImg(this)" onerror="mockErr(this)">`;
     osc = `<div class="osc"><span class="l1">${esc(i.title)}</span>${lines}</div>`; }
   if ((i.mock || {}).nooverlay) osc = '';
   else if (((i.mock || {}).ads || [])[0] && i.mock.ads[0].line) osc = `<div class="osc"><span class="l1">${esc(i.mock.ads[0].line)}</span></div>`;   // Nov 10: the card's own on-screen line
   const fallback = fid ? 'Content could not load. Sign in to Google with your dlmedia.org account, or open it in Drive.' : ext ? `${esc(pk.title)} · this file sits on ${ext}, which cannot show inside the card. Open it there.` : 'Mock ad · no catalogued content matched yet, pick one below';
-  return `<div class="creative ${fid ? 'has-media' : ''}" data-id="${esc(i.id)}" title="${pk && pk.kind === 'video' ? 'Video plays here' : 'Click to drop a pin'}">${media}<div class="typecard"><div>
+  return `<div class="creative ${fid ? 'has-media' : ''}" data-id="${esc(i.id)}"${fxR(pk)} title="${pk && pk.kind === 'video' ? 'Video plays here' : 'Click to drop a pin'}">${media}<div class="typecard"><div>
       <div class="q">${esc(i.title)}</div><span class="s">${esc(i.type || '')}${i.persona ? ' · ' + esc(i.persona) : ''}<br>${esc(fallback)}</span></div></div>${osc}${pins}${p}
       ${(i.mock && i.mock.comments && i.mock.comments.length && fid) ? `<div class="bubbles">${i.mock.comments.slice(0, 3).map(c => `<div class="bubble"><b>Commenter</b>${esc(c)}</div>`).join('')}</div>` : ''}
       ${(!fid && !ext && i.mock && i.mock.note) ? `<div class="cnote">${esc(i.mock.note)}</div>` : ''}
@@ -505,13 +513,13 @@ function adCard(i, a, k){
   const L = oscOf(i), line = a.line || (/ B$/.test(a.label) ? L[1] : L[0]) || i.title;
   let media = '';
   if (it && it.src && it.kind === 'video') media = `<video src="${esc(it.src)}" muted loop autoplay playsinline preload="metadata"${(i.mock || {}).nooverlay ? ' controls' : ''} style="width:100%;height:100%;object-fit:cover;background:#000"></video>`;   // Nov 6: Remotion video mocks from our own storage
-  else if (it && it.src) media = `<img src="${esc(it.src)}" alt="${esc(it.title || '')}" loading="lazy" onerror="mockErr(this)" style="object-fit:contain;background:#fff">`;
-  else if (fid && it.kind === 'video') media = `<iframe src="${esc(VID(fid))}" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="${esc(it.title || 'Video')}"></iframe>`;
-  else if (fid) media = `<img src="${esc(IMG(fid))}" data-alt="${esc(IMG2(fid))}" alt="${esc(it.title || '')}" loading="lazy" onerror="mockErr(this)">`;
+  else if (it && it.src) media = `<img src="${esc(it.src)}" alt="${esc(it.title || '')}" loading="lazy" onload="fxImg(this)" onerror="mockErr(this)" style="object-fit:contain;background:#fff">`;
+  else if (fid && it.kind === 'video') media = `<iframe src="${esc(VID(fid))}" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="${esc(it.title || 'Video')}"></iframe><button type="button" class="fsbtn" onclick="event.stopPropagation();fxFull(this)">⛶ Full screen</button>`;
+  else if (fid) media = `<img src="${esc(IMG(fid))}" data-alt="${esc(IMG2(fid))}" alt="${esc(it.title || '')}" loading="lazy" onload="fxImg(this)" onerror="mockErr(this)">`;
   const open = it && it.drive ? `<a class="drivelink" href="${esc(it.drive)}" target="_blank" rel="noopener">Open ↗</a>` : '';
   return `<div class="variant"><div class="vlab">${esc(a.label)} <em>${a.kind === 'video' ? 'video' : 'static'}</em></div>
       ${adHead(i, a)}
-      <div class="creative ${media ? 'has-media' : ''}" data-id="${esc(i.id)}" data-v="${k}" title="Click to drop a pin">${media}${pinsOn(i, k)}<div class="typecard"><div><div class="q">${esc(i.title)}</div><span class="s">${esc(a.label)}<br>${it ? 'Content could not load. Open it in Drive.' : 'No content yet.'}</span></div></div>
+      <div class="creative ${media ? 'has-media' : ''}" data-id="${esc(i.id)}" data-v="${k}"${fxR(it)} title="Click to drop a pin">${media}${pinsOn(i, k)}<div class="typecard"><div><div class="q">${esc(i.title)}</div><span class="s">${esc(a.label)}<br>${it ? 'Content could not load. Open it in Drive.' : 'No content yet.'}</span></div></div>
         ${(i.mock || {}).nooverlay ? '' : `<div class="osc${a.kind === 'video' ? ' onvideo' : ''}"><span class="l1">${esc(line)}</span></div>`}
         ${a.kind === 'video' ? `<div class="vtag">▶ Video${a.song ? ' · ' + esc(a.song) : ''}</div>` : ''}${open}</div>
       <div class="adfoot"><div class="af-t"><small>${esc((DOMAINS[i.brand] || '').toUpperCase())}</small><b${hasCopy(i) ? ` data-hid="${esc(i.id)}"` : ''}>${esc(hasCopy(i) ? metaCopy(i).headline : line)}</b></div><span class="af-b">Shop now</span></div>
