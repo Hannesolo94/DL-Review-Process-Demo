@@ -28,3 +28,8 @@ tools/*_before.json
 
 .dbpass
 .dsn_new
+
+.env_old
+.dsn_old
+.env.new
+.newsecret
