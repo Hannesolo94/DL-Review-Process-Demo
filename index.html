@@ -542,7 +542,7 @@ let ASSETS = [];
 function driveify(a){
   a = Object.assign({}, a);
   if (a.drive){
-    if (a.kind === 'image') a.src = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(a.drive) + '&sz=w2000';
+    if (a.kind === 'image') a.src = 'https://lh3.googleusercontent.com/d/' + encodeURIComponent(a.drive) + '=w2000';   /* the drive thumbnail link fails when a browser holds several Google accounts; lh3 works */
     else { a.dsrc = 'https://drive.google.com/file/d/' + encodeURIComponent(a.drive) + '/preview'; a.src = ''; }
   } else if (a.src && /yobtgnpwbqcnvedzrmlh\.supabase\.co/.test(a.src)){ a.src = ''; a.archived = true; }
   return a;
