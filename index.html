@@ -599,7 +599,7 @@ const fromRow = r => ({
   primaries:r.primaries, state:r.state, createdAt:r.created_at
 });
 
-let SLUG = '', CLIENT_COPY = false, VL = {}, PREV = {}, TYPE_NOTES = false, round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
+let LIVE_ROUND = 1, SLUG = '', CLIENT_COPY = false, VL = {}, PREV = {}, TYPE_NOTES = false, round = 1, notes = [], db = null, viewer = '', draft = null, pick = 'ours', pendingDel = null, pendingVerdict = null;
 
 /* ---- which view: the link decides, the switch is for demoing ---- */
 let view = (location.hash || '').replace('#','').toLowerCase() === 'client' ? 'client' : 'creator';
@@ -677,7 +677,7 @@ async function boot(){
       if (d.brand) BRAND = d.brand;
       if (d.copy)  COPY  = d.copy;
       CLIENT_COPY = !!d.clientCopy; VL = d.verdictLabels || {}; PREV = { label: d.prevLabel, general: d.prevGeneral }; TYPE_NOTES = !!d.typeNotes;   /* Oct 30: a type-in note box under every static */   /* Oct 29: per page button words, e.g. Run it / Don't run */
-      round = b.round || 1;
+      round = b.round || 1; LIVE_ROUND = round;
       SLUG = b.slug || '';
       view = (b.view === 'client') ? 'client' : 'creator';
       viewLocked = true;
@@ -1077,10 +1077,12 @@ function askName(){
   try { inp.focus({ preventScroll:true }); } catch(e) { inp.focus(); }
 }
 function drawRounds(){
-  $('#rounds').innerHTML = ROUNDS.map(r =>
+  /* Nov 12: the list follows the brief's stored round (it used to say Round 1 live on every page) */
+  const top = Math.max(1, LIVE_ROUND || 1), RL = Array.from({length: top}, (_, i) => ({ n: i + 1, label: 'Round ' + (i + 1), live: i + 1 === top }));
+  $('#rounds').innerHTML = RL.map(r =>
     '<button class="rnd" type="button" aria-pressed="' + (r.n === round) + '" data-r="' + r.n + '">' +
     esc(r.label) + (r.live ? ' &middot; live' : '') + '</button>'
-  ).join('') + '<button class="rnd" type="button" disabled>Round 2 on next upload</button>';
+  ).join('') + '<button class="rnd" type="button" disabled>Round ' + (top + 1) + ' on next upload</button>';
   $('#rounds').querySelectorAll('[data-r]').forEach(b => b.onclick = () => { round = +b.dataset.r; drawRounds(); redraw(); });
 }
 function drawAssets(){
