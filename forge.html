@@ -612,7 +612,7 @@ function bodyOf(i){
 
 function render(){
   if (!board) return;
-  const list = SOLO ? ideas().filter(i => i.id === SOLO) : ideas(), brands = ORDER.filter(b => list.some(i => i.brand === b));
+  const list = SOLO ? ideas().filter(i => i.id === SOLO) : ideas(), brands = [...(board.order || []), ...ORDER].filter((b, k, a) => a.indexOf(b) === k && list.some(i => i.brand === b));   /* Nov 13: a board can set its own brand order (David's board: OTX first) */
   if (SOLO) list.forEach(i => open.add(i.id));
   document.getElementById('filters').innerHTML = ['all', ...brands].map(b => `<button class="chip" data-f="${b}" aria-pressed="${filt === b}">${b === 'all' ? 'All' : b} ${b === 'all' ? list.length : list.filter(i => i.brand === b).length}</button>`).join('');
   const tally = { ok:0, wait:0, kill:0, chg:0 }; list.forEach(i => tally[stateOf(i)]++);
