@@ -427,9 +427,9 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 .frame.rbox iframe.dvid:fullscreen{transform:none!important;width:100%!important;height:100%!important}
 /* Nov 13 (Hannes, CTF0295): carousel ads show as ONE feed post, cards side by side, swipe or arrows, next card peeking */
 .post.carousel .car-track{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 12px 10px;scrollbar-width:thin}
-.post.carousel .car-card{flex:0 0 82%;scroll-snap-align:start;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--line-soft);box-shadow:0 1px 3px rgba(0,0,0,.25)}
-.post.carousel .car-card .frame.rbox{display:block;width:100%;border-radius:0;margin:0}
-.post.carousel .car-card .post-bar{padding:9px 10px;background:var(--line-soft);border:0;margin:0}
+.post.carousel .car-card{flex:0 0 82%;scroll-snap-align:start;border-radius:6px;overflow:hidden}
+.post.carousel .car-card .frame.rbox{display:block;width:100%;margin:0}
+.post.carousel .car-track{padding:0 12px 8px}
 .post.carousel .car-n{position:absolute;left:8px;top:8px;z-index:3;background:rgba(0,0,0,.6);color:#fff;font:600 11px/1 system-ui,sans-serif;padding:4px 7px;border-radius:20px;line-height:1}
 .post.carousel .car-nav{display:flex;justify-content:center;gap:10px;padding:0 0 10px}
 .post.carousel .car-nav button{border:1px solid var(--line);background:var(--surface);color:inherit;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;line-height:1}
@@ -1531,7 +1531,7 @@ function drawPreviews(){
           '<span class="car-n">' + (i + 1) + '/' + car.length + '</span>' +
           '<img src="' + m.src + '" alt="' + esc(m.title) + ', carousel card ' + (i + 1) + '" referrerpolicy="no-referrer" onload="crRatio(this)"' + (m.drive ? ' data-drive="' + esc(m.drive) + '" onerror="crNoAccess(this)"' : '') + '>' +
           '<button class="zoom" type="button" data-big="' + a.id + '" title="Open larger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/></svg>Expand</button>' +
-          '</div><div class="post-bar"><div><div class="d">' + esc(BRAND.domain) + '</div><div class="h"></div></div><span class="post-cta">' + esc(BRAND.cta) + '</span></div></div>';
+          '</div></div>';
       };
       el.innerHTML =
         '<div class="adprev-hd"><span class="lab">Carousel, ' + car.length + ' cards. Swipe, then click a card to leave a note</span><div class="vchips"></div></div>' +
@@ -1541,6 +1541,7 @@ function drawPreviews(){
           '<div class="post-primary"></div>' +
           '<div class="car-track">' + car.map(cardHtml).join('') + '</div>' +
           '<div class="car-nav"><button type="button" data-car="-1" aria-label="Previous card">&#8249;</button><button type="button" data-car="1" aria-label="Next card">&#8250;</button></div>' +
+          '<div class="post-bar"><div><div class="d">' + esc(BRAND.domain) + '</div><div class="h"></div></div><span class="post-cta">' + esc(BRAND.cta) + '</span></div>' +
         '</div>';
       el.dataset.built = '1'; return;
     }
