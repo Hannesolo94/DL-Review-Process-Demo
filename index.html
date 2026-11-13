@@ -434,6 +434,8 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 .post.carousel .car-nav{display:flex;justify-content:center;gap:10px;padding:0 0 10px}
 .post.carousel .car-nav button{border:1px solid var(--line);background:var(--surface);color:inherit;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;line-height:1}
 .car-note{font-size:13px;color:var(--faint);padding:6px 2px}
+.car-lab{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);font-weight:600;padding:12px 16px 0}
+section.asset[hidden]{display:none!important}
 .modal-body .frame.rbox{width:min(100%, calc((100dvh - 210px) * var(--r, 1)))}
 .modal-body .frame.rbox img,.modal-body .frame.rbox video{max-height:none}
 .frame[data-kind="video"] .zoom{opacity:1}
@@ -830,9 +832,9 @@ async function setVerdict(assetId, state){
 }
 document.addEventListener('click', ev => {
   const ok = ev.target.closest && ev.target.closest('[data-ok]');
-  if (ok) return setVerdict(ok.dataset.ok, 'approved');
+  if (ok) return carVerdict(ok.dataset.ok, 'approved');
   const no = ev.target.closest && ev.target.closest('[data-no]');
-  if (no) return setVerdict(no.dataset.no, 'changes');
+  if (no) return carVerdict(no.dataset.no, 'changes');
 });
 function drawVerdicts(){
   let approved = 0, changes = 0;
@@ -1274,8 +1276,42 @@ function openDraft(asset, at, why){
   k.querySelector('#dSave').onclick = save;
 }
 
+/* Nov 13 (Hannes, CTF0295): a carousel is ONE card. Its verdict covers every card, so the other cards follow card 1. */
+async function carVerdict(id, state){
+  await setVerdict(id, state);
+  const a = ASSETS.find(x => x.id === id), car = a && carGroup(a);
+  if (!car || car[0].id !== id) return;
+  const L = (myVerdict(id) || {}).state || null;
+  for (const m of car.slice(1)){
+    const cur = (myVerdict(m.id) || {}).state || null;
+    if (cur === L) continue;
+    if (L === 'approved') await setVerdict(m.id, 'approved');
+    else if (cur) await setVerdict(m.id, cur);   /* clears it: same state again toggles off */
+  }
+}
+function carMerge(){
+  const seen = new Set();
+  ASSETS.forEach(a => {
+    const car = carGroup(a); if (!car || seen.has(car[0].id)) return; seen.add(car[0].id);
+    const lp = document.getElementById('p-' + car[0].id), lead = lp && lp.closest('section');
+    if (!lead || lead.dataset.car) return; lead.dataset.car = '1';
+    const h3 = lead.querySelector('.asset-hd h3');
+    if (h3) h3.textContent = car[0].title.replace(/\s*-?\s*carousel card 1 of \d+.*$/i, '') + ' - carousel, ' + car.length + ' cards';
+    const osc = lead.querySelector('.asset-hd .osc');
+    if (osc) osc.textContent = car.map((m, i) => 'Card ' + (i + 1) + ': ' + (m.osc || '')).join('  ·  ');
+    const l1 = document.getElementById('l-' + car[0].id);
+    if (l1){ const t = document.createElement('div'); t.className = 'car-lab'; t.textContent = 'Card 1 notes'; l1.prepend(t); }
+    car.slice(1).forEach((m, i) => {
+      const mp = document.getElementById('p-' + m.id), sec = mp && mp.closest('section');
+      const low = document.getElementById('l-' + m.id);
+      if (low){ const t = document.createElement('div'); t.className = 'car-lab'; t.textContent = 'Card ' + (i + 2) + ' notes'; low.prepend(t); lead.appendChild(low); }
+      if (sec) sec.hidden = true;
+    });
+  });
+}
 function redraw(){
   drawPreviews();   /* the frames must exist before pins go on them; it only builds once */
+  carMerge();
   let total = 0;
   ASSETS.forEach(a => {
     const mine = notes.filter(n => n.assetId === a.id && n.round === round && n.kind !== 'verdict')
