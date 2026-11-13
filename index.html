@@ -421,6 +421,10 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 .frame.rbox{display:block;margin:0 auto;width:min(100%, calc(430px * var(--r, 1)));aspect-ratio:var(--r, auto);background:#0b0b0b}
 .frame.rbox:not([style]){width:auto;aspect-ratio:auto}
 .frame.rbox img,.frame.rbox iframe,.frame.rbox video{width:100%;height:100%;max-height:none;object-fit:contain}
+/* Nov 13 (Hannes, PLT0211): Drive's /preview player crops and offsets portrait video in a narrow frame. Render it at full size and scale it down. */
+.frame.rbox[style]{overflow:hidden}
+.frame.rbox iframe.dvid{position:absolute;left:0;top:0;max-width:none;max-height:none;transform-origin:0 0}
+.frame.rbox iframe.dvid:fullscreen{transform:none!important;width:100%!important;height:100%!important}
 .modal-body .frame.rbox{width:min(100%, calc((100dvh - 210px) * var(--r, 1)))}
 .modal-body .frame.rbox img,.modal-body .frame.rbox video{max-height:none}
 .frame[data-kind="video"] .zoom{opacity:1}
@@ -1437,6 +1441,15 @@ function currentCopy(){
   const v = variants(notes.find(x => x.id === key) || {});
   return v[i] || v[0] || { headline: COPY.headline, primary: COPY.primary };
 }
+function crFitDvid(){
+  document.querySelectorAll('.frame.rbox iframe.dvid').forEach(f => {
+    const b = f.parentElement, R = parseFloat(getComputedStyle(b).getPropertyValue('--r')) || 9 / 16;
+    const IW = R < 1 ? 405 : 720, IH = IW / R, w = b.clientWidth;
+    f.style.width = IW + 'px'; f.style.height = IH + 'px';
+    if (w) f.style.transform = 'scale(' + (w / IW) + ')';
+  });
+}
+window.addEventListener('resize', crFitDvid);
 function drawPreviews(){
   ASSETS.forEach(a => {
     const el = document.getElementById('p-' + a.id);
@@ -1467,6 +1480,7 @@ function drawPreviews(){
           '<div class="h"></div></div><span class="post-cta">' + esc(BRAND.cta) + '</span></div>' +
       '</div>';
     el.dataset.built = '1';
+    requestAnimationFrame(crFitDvid);   /* Nov 13: scale the Drive player once the card has its width */
     if (a.kind === 'video' && !a.src && a.drive){   /* Drive's player can't tell us the time, so the reviewer types it */
       const btn = document.getElementById('vt-' + a.id);
       if (btn) btn.onclick = () => { const x = document.getElementById('vx-' + a.id); openDraft(a, { t: mmssToSec(x && x.value) }); };
@@ -1529,6 +1543,7 @@ function openBig(id){
   $('#mMedia').appendChild(p); $('#mSide').appendChild(l);
   modal.hidden = false;
   $('#mClose').focus();
+  requestAnimationFrame(crFitDvid);
 }
 function closeBig(){
   if (!bigId) return;
@@ -1536,6 +1551,7 @@ function closeBig(){
   document.getElementById('ph-p').replaceWith(p);
   document.getElementById('ph-l').replaceWith(l);
   modal.hidden = true; bigId = null;
+  requestAnimationFrame(crFitDvid);
 }
 document.addEventListener('click', ev => {
   const b = ev.target.closest && ev.target.closest('[data-big]');
