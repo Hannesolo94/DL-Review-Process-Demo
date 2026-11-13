@@ -425,6 +425,15 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 .frame.rbox[style]{overflow:hidden}
 .frame.rbox iframe.dvid{position:absolute;left:0;top:0;max-width:none;max-height:none;transform-origin:0 0}
 .frame.rbox iframe.dvid:fullscreen{transform:none!important;width:100%!important;height:100%!important}
+/* Nov 13 (Hannes, CTF0295): carousel ads show as ONE feed post, cards side by side, swipe or arrows, next card peeking */
+.post.carousel .car-track{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 12px 10px;scrollbar-width:thin}
+.post.carousel .car-card{flex:0 0 82%;scroll-snap-align:start;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.post.carousel .car-card .frame.rbox{width:100%}
+.post.carousel .car-card .post-bar{padding:8px 10px}
+.post.carousel .car-n{position:absolute;left:8px;top:8px;z-index:3;background:rgba(0,0,0,.6);color:#fff;font:600 11px/1 system-ui,sans-serif;padding:4px 7px;border-radius:20px;line-height:1}
+.post.carousel .car-nav{display:flex;justify-content:center;gap:10px;padding:0 0 10px}
+.post.carousel .car-nav button{border:1px solid var(--line);background:var(--surface);color:inherit;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;line-height:1}
+.car-note{font-size:13px;color:var(--faint);padding:6px 2px}
 .modal-body .frame.rbox{width:min(100%, calc((100dvh - 210px) * var(--r, 1)))}
 .modal-body .frame.rbox img,.modal-body .frame.rbox video{max-height:none}
 .frame[data-kind="video"] .zoom{opacity:1}
@@ -1441,6 +1450,13 @@ function currentCopy(){
   const v = variants(notes.find(x => x.id === key) || {});
   return v[i] || v[0] || { headline: COPY.headline, primary: COPY.primary };
 }
+function carGroup(a){
+  const m = /^(.*)_C(\d+)$/.exec(a.id || '');
+  const key = a.carousel || (m && m[1]); if (!key) return null;
+  const members = ASSETS.filter(x => (x.carousel || ((/^(.*)_C(\d+)$/.exec(x.id || '') || [])[1])) === key)
+    .sort((p, q) => (+((/_C(\d+)$/.exec(p.id) || [])[1]) || 0) - (+((/_C(\d+)$/.exec(q.id) || [])[1]) || 0));
+  return members.length > 1 ? members : null;
+}
 function crFitDvid(){
   document.querySelectorAll('.frame.rbox iframe.dvid').forEach(f => {
     const b = f.parentElement, R = parseFloat(getComputedStyle(b).getPropertyValue('--r')) || 9 / 16;
@@ -1467,6 +1483,31 @@ function drawPreviews(){
         'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
         '<path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/></svg>Expand</button>' +
       '</div>';
+    const car = carGroup(a);
+    if (car && car[0].id !== a.id){
+      el.innerHTML = '<div class="car-note">Card ' + (car.indexOf(a) + 1) + ' of ' + car.length + ' in the carousel above. Swipe to it there and click it to leave a note.</div>';
+      el.dataset.built = '1'; return;
+    }
+    if (car){
+      const cardHtml = (m, i) => {
+        const Rm = ratioNum(m.spec) || 1;
+        return '<div class="car-card"><div class="frame rbox" data-asset="' + m.id + '" data-kind="image" style="--r:' + Rm.toFixed(4) + '">' +
+          '<span class="car-n">' + (i + 1) + '/' + car.length + '</span>' +
+          '<img src="' + m.src + '" alt="' + esc(m.title) + ', carousel card ' + (i + 1) + '" referrerpolicy="no-referrer" onload="crRatio(this)"' + (m.drive ? ' data-drive="' + esc(m.drive) + '" onerror="crNoAccess(this)"' : '') + '>' +
+          '<button class="zoom" type="button" data-big="' + a.id + '" title="Open larger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/></svg>Expand</button>' +
+          '</div><div class="post-bar"><div><div class="d">' + esc(BRAND.domain) + '</div><div class="h"></div></div><span class="post-cta">' + esc(BRAND.cta) + '</span></div></div>';
+      };
+      el.innerHTML =
+        '<div class="adprev-hd"><span class="lab">Carousel, ' + car.length + ' cards. Swipe, then click a card to leave a note</span><div class="vchips"></div></div>' +
+        '<div class="post carousel">' +
+          '<div class="post-top"><div class="av">' + esc(BRAND.initials) + '</div>' +
+            '<div class="post-who"><b>' + esc(BRAND.name) + '</b><span>Sponsored</span></div></div>' +
+          '<div class="post-primary"></div>' +
+          '<div class="car-track">' + car.map(cardHtml).join('') + '</div>' +
+          '<div class="car-nav"><button type="button" data-car="-1" aria-label="Previous card">&#8249;</button><button type="button" data-car="1" aria-label="Next card">&#8250;</button></div>' +
+        '</div>';
+      el.dataset.built = '1'; return;
+    }
     el.innerHTML =
       '<div class="adprev-hd"><span class="lab">' +
         (a.kind === 'image' ? 'Click the creative to leave a note' : 'Pause, then note that moment') +
@@ -1505,6 +1546,13 @@ document.addEventListener('click', ev => {
   if (!m) return;
   const go = m.requestFullscreen || m.webkitRequestFullscreen || m.webkitEnterFullscreen;
   if (go) { try { const r = go.call(m); if (r && r.catch) r.catch(() => openBig(b.dataset.fs)); } catch (_) { openBig(b.dataset.fs); } } else openBig(b.dataset.fs);
+});
+
+/* ---- carousel arrows ---- */
+document.addEventListener('click', ev => {
+  const b = ev.target.closest && ev.target.closest('[data-car]'); if (!b) return;
+  const tr = b.closest('.post').querySelector('.car-track'); const c = tr && tr.querySelector('.car-card');
+  if (tr && c) tr.scrollBy({ left: (+b.dataset.car) * (c.getBoundingClientRect().width + 8), behavior: 'smooth' });
 });
 
 /* ---- pin by clicking the creative, in the card or expanded ---- */
@@ -1581,7 +1629,7 @@ function syncPreview(){
     const a = ASSETS.find(x => 'p-' + x.id === el.id);
     const own = (pick === 'ours' && a && a.copy) ? assetCopy(a) : c;
     const p = el.querySelector('.post-primary'); if (p) p.textContent = own.primary;
-    const h = el.querySelector('.post-bar .h'); if (h) h.textContent = own.headline;
+    el.querySelectorAll('.post-bar .h').forEach(h => { h.textContent = own.headline; });
   });
 }
 document.addEventListener('click', ev => {
