@@ -429,10 +429,12 @@ body[data-view="client"] .shell{grid-template-columns:minmax(0,1fr)}
 .post.carousel .car-track{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 12px 10px;scrollbar-width:thin}
 .post.carousel .car-card{flex:0 0 82%;scroll-snap-align:start;border-radius:6px;overflow:hidden}
 .post.carousel .car-card .frame.rbox{display:block;width:100%;margin:0}
-.post.carousel .car-track{padding:0 12px 8px}
+.post.carousel .car-track{padding:0 0 0 12px;scrollbar-width:none}
+.post.carousel .car-track::-webkit-scrollbar{display:none}
 .post.carousel .car-n{position:absolute;left:8px;top:8px;z-index:3;background:rgba(0,0,0,.6);color:#fff;font:600 11px/1 system-ui,sans-serif;padding:4px 7px;border-radius:20px;line-height:1}
-.post.carousel .car-nav{display:flex;justify-content:center;gap:10px;padding:0 0 10px}
-.post.carousel .car-nav button{border:1px solid var(--line);background:var(--surface);color:inherit;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;line-height:1}
+.post.carousel .car-wrap{position:relative}
+.post.carousel .car-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:5;border:0;background:rgba(0,0,0,.55);color:#fff;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:18px;line-height:1;display:grid;place-items:center}
+.post.carousel .car-arrow.prev{left:6px}.post.carousel .car-arrow.next{right:6px}
 .car-note{font-size:13px;color:var(--faint);padding:6px 2px}
 .car-lab{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);font-weight:600;padding:12px 16px 0}
 section.asset[hidden]{display:none!important}
@@ -1539,8 +1541,8 @@ function drawPreviews(){
           '<div class="post-top"><div class="av">' + esc(BRAND.initials) + '</div>' +
             '<div class="post-who"><b>' + esc(BRAND.name) + '</b><span>Sponsored</span></div></div>' +
           '<div class="post-primary"></div>' +
-          '<div class="car-track">' + car.map(cardHtml).join('') + '</div>' +
-          '<div class="car-nav"><button type="button" data-car="-1" aria-label="Previous card">&#8249;</button><button type="button" data-car="1" aria-label="Next card">&#8250;</button></div>' +
+          '<div class="car-wrap"><div class="car-track">' + car.map(cardHtml).join('') + '</div>' +
+          '<button type="button" class="car-arrow prev" data-car="-1" aria-label="Previous card">&#8249;</button><button type="button" class="car-arrow next" data-car="1" aria-label="Next card">&#8250;</button></div>' +
           '<div class="post-bar"><div><div class="d">' + esc(BRAND.domain) + '</div><div class="h"></div></div><span class="post-cta">' + esc(BRAND.cta) + '</span></div>' +
         '</div>';
       el.dataset.built = '1'; return;
