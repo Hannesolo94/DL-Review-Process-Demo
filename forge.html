@@ -234,7 +234,12 @@ body.solo .brandgroup>h3 small{display:none}
 .creative{aspect-ratio:var(--r, 4/5)}
 .creative img{object-fit:contain;background:#0b0b0b}
 .creative .fsbtn{position:absolute;left:8px;bottom:8px;z-index:4;font:600 11px var(--mono);background:rgba(0,0,0,.65);color:#fff;border:0;border-radius:6px;padding:4px 9px;cursor:pointer}
+/* Nov 17 2026 (Hannes): a board that is mid-fix says so. data.hold {by, why, since} = amber bar on top, cards dimmed; cleared = gone. Set/clear with tools/forge_hold.py. */
+.holdbar{position:sticky;top:0;z-index:30;background:var(--warn-soft);color:var(--warn);border-bottom:2px solid var(--warn);padding:12px 20px;font:600 15px var(--body);text-align:center}
+.holdbar b{font-family:var(--display);font-size:20px;letter-spacing:.04em;margin-right:6px}
+body.held .rail{top:var(--holdh,48px)} body.held #board, body.held .throw{opacity:.6}
 </style></head><body>
+<div class="holdbar" id="holdbar" role="status" hidden></div>
 <div class="wrap">
 <header class="top">
   <div>
@@ -652,8 +657,15 @@ function bodyOf(i){
     ${stateOf(i) === 'ok' ? `<div class="build" style="display:block">Approved by ${esc(appr)}. It goes to the Idea Library as <b>Forged</b> within the hour, ready to brief.</div>` : ''}`;
 }
 
+function drawHold(){
+  const h = board && board.hold, el = document.getElementById('holdbar'); if (!el) return;
+  document.body.classList.toggle('held', !!h); el.hidden = !h;
+  el.innerHTML = h ? `<b>NOT READY:</b> being fixed${h.why ? ' (' + esc(h.why) + ')' : ''}. You'll get a message when it passes.` : '';
+  if (h) document.body.style.setProperty('--holdh', el.offsetHeight + 'px');
+}
 function render(){
   if (!board) return;
+  drawHold();
   const list = SOLO ? ideas().filter(i => i.id === SOLO) : ideas(), brands = [...(board.order || []), ...ORDER].filter((b, k, a) => a.indexOf(b) === k && list.some(i => i.brand === b));   /* Nov 13: a board can set its own brand order (David's board: OTX first) */
   if (SOLO) list.forEach(i => open.add(i.id));
   document.getElementById('filters').innerHTML = ['all', ...brands].map(b => `<button class="chip" data-f="${b}" aria-pressed="${filt === b}">${b === 'all' ? 'All' : b} ${b === 'all' ? list.length : list.filter(i => i.brand === b).length}</button>`).join('');
