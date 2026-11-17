@@ -7,7 +7,8 @@
 A held board shows an amber "NOT READY: being fixed (<why>)" bar on forge.html and its cards dim. Only the critic
 (Inquisitor) or Magnus sets and clears it. The script reads the row first and backs it up to backups/forge_hold/,
 then changes data.hold and nothing else (one jsonb_set / jsonb minus, updated_at untouched), and checks that the rest
-of data is unchanged afterwards.
+of data is unchanged afterwards. NOTE: a builder that rewrites the whole data column drops the hold. Builders must
+keep data.hold when they write a board, or supabase/forge_keep_hold.sql (a trigger, NOT installed) must be applied.
 """
 import argparse
 import datetime as dt
@@ -54,6 +55,7 @@ def main():
             if 'hold' not in data:
                 print(f'{a.slug}: no hold to clear')
                 return
+            c.execute("set local forge.clear_hold = 'on'")   # the forge_keep_hold trigger lets this one clear through
             c.execute("update briefs set data = data - 'hold' where id = %s", (bid,))
         after = c.execute('select data from briefs where id = %s', (bid,)).fetchone()[0]
         rest = lambda d: {k: v for k, v in d.items() if k != 'hold'}
