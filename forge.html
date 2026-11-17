@@ -203,6 +203,7 @@ nav.tabs,.rail,#p-flow,#p-fri,#p-wed{display:none!important}
 .creative .bubble{align-self:flex-start;max-width:92%;background:rgba(255,255,255,.94);color:#16191c;border-radius:14px;padding:6px 10px;font:500 12px var(--body);line-height:1.3;box-shadow:0 1px 4px rgba(0,0,0,.35)}
 .creative .bubble b{display:block;font-size:11px;color:#5d656d;margin-bottom:1px}
 .winner .creative iframe{background:#fff}
+.winner .creative .typecard.wmiss{background:var(--warn-soft);color:var(--warn)} .winner .creative .typecard.wmiss .s{color:var(--warn);font-weight:600} .winner .creative .typecard.wmiss .q{font-size:20px;overflow-wrap:anywhere}
 .vlab em.win{color:var(--ember)}
 .creative .cnote{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;background:rgba(0,0,0,.65);color:#fff;font:400 12px var(--body)}
 .creative iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:#000}
@@ -526,11 +527,52 @@ function adCard(i, a, k){
       ${it && it.rating === 'Mock' && it.what ? `<ul class="why">${String(it.what).split(' | ').slice(0, 2).map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
       ${it && it.title ?`<div class="vsub">${esc(it.title)}${a.note ? ' · ' + esc(a.note) : ''}</div>` : ''}</div>`;
 }
+// Nov 17 2026 (Hannes, repeat of his Nov 6 note): "What it builds on" never shows an empty box. No story id = show the
+// source ad from the card's own Drive files (winner.drive, else files named after the ad, "Source ad" ones first, else any "Source ad" file);
+// no file either = an amber note. The Ads Manager link stays either way. A file that will not load (private, thumbnail
+// not ready) steps to the next match before the amber note shows.
+const wfid = it => it && !it.src ? (/^[\w-]{20,}$/.test(it.catalog_id || '') ? it.catalog_id : driveId(it.drive)) : '';
+function winnerSources(i, w){
+  const own = { kind:w.kind || 'image', catalog_id:w.catalog_id, drive:w.drive, ratio:w.ratio, title:w.ad };
+  const m = i.mock || {};
+  const pool = (m.ads || []).map(a => a.item ? Object.assign({ label:a.label }, a.item) : null).concat([m.pick], m.candidates || []).filter(it => it && wfid(it));
+  const ad = String(w.ad || '').toLowerCase().replace(/\.(mp4|mov|png|jpe?g)$/, ''), txt = it => ((it.title || '') + ' ' + (it.label || '')).toLowerCase();
+  const src = it => /source ad/.test(txt(it)), named = it => !!ad && txt(it).includes(ad);
+  const out = [], seen = new Set();
+  [wfid(own) ? [own] : [], pool.filter(it => src(it) && named(it)), pool.filter(named), ad && pool.some(named) ? [] : pool.filter(src)].flat()
+    .forEach(it => { const f = wfid(it); if (!seen.has(f)) { seen.add(f); out.push(it); } });
+  return out;
+}
+const WINQ = {};
+function winMedia(it, alt){
+  const fid = wfid(it);
+  return it.kind === 'video'
+    ? `<iframe src="${esc(VID(fid))}" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="${esc(it.title || alt)}"></iframe><button type="button" class="fsbtn" onclick="event.stopPropagation();fxFull(this)">⛶ Full screen</button>`
+    : `<img src="${esc(IMG2(fid))}" data-alt="${esc(IMG(fid))}" alt="${esc(it.title || alt)}" loading="lazy" onload="fxImg(this)" onerror="winNext(this)">`;
+}
+window.winNext = img => {            // image failed: try lh3, then the next matching file, then the amber note
+  if (img.dataset.alt) { img.src = img.dataset.alt; img.dataset.alt = ''; return; }
+  const c = img.closest('.creative'), q = c && WINQ[c.dataset.wq]; img.remove(); if (!c) return;
+  const k = +(c.dataset.wk || 0) + 1, it = q && q[k];
+  if (!it) { c.classList.remove('has-media'); c.classList.add('no-media'); return; }
+  c.dataset.wk = k; const r = fxNum(it.ratio) || (it.kind === 'video' ? 9 / 16 : null); if (r) c.style.setProperty('--r', r.toFixed(4)); else c.style.removeProperty('--r');
+  c.insertAdjacentHTML('afterbegin', winMedia(it, 'Source ad'));
+  const sub = c.parentNode.querySelector('.vsub'); if (sub) sub.textContent = it.title || '';
+};
 function winnerCard(i){
   const w = i.mock && i.mock.winner; if (!w) return '';
-  if (!w.story) return w.ad_id && w.account ? `<div class="variant winner"><div class="vlab">What it builds on <em class="win">${esc(w.brief || 'original')}</em></div>
+  if (!w.story) {
+    const am = w.ad_id && w.account ? `https://adsmanager.facebook.com/adsmanager/manage/ads?act=${encodeURIComponent(w.account)}&selected_ad_ids=${encodeURIComponent(w.ad_id)}` : '';
+    const q = winnerSources(i, w), it = q[0] || null; if (!am && !it) return '';
+    WINQ[i.id] = q;
+    const media = it ? winMedia(it, w.ad || 'Source ad') : '';
+    const miss = am ? 'Source ad not embedded yet: open in Ads Manager' : 'Source ad not embedded yet';
+    const link = am ? `<a class="drivelink" href="${esc(am)}" target="_blank" rel="noopener">Open in Ads Manager ↗</a>` : `<a class="drivelink" href="${esc(it.drive)}" target="_blank" rel="noopener">Open in Drive ↗</a>`;
+    return `<div class="variant winner"><div class="vlab">What it builds on <em class="win">${esc(w.brief || 'original')}</em></div>
       <div class="ad-head"><div class="av">${esc(i.brand)}</div><div class="who"><b>${esc(w.ad || 'The original')}</b><small>Live ad${w.spend ? ' · $' + esc(w.spend) + ' spent' : ''}</small></div></div>
-      <a class="drivelink" href="https://adsmanager.facebook.com/adsmanager/manage/ads?act=${esc(w.account)}&selected_ad_ids=${esc(w.ad_id)}" target="_blank" rel="noopener">Open in Ads Manager ↗</a></div>` : '';
+      <div class="creative ${media ? 'has-media' : ''}" data-wq="${esc(i.id)}" data-wk="0"${fxR(it || { ratio:w.ratio })} title="The source ad">${media}<div class="typecard wmiss"><div><div class="q">${esc(w.ad || 'The original')}</div><span class="s">${esc(miss)}</span></div></div>${link}</div>
+      ${it && it.title ? `<div class="vsub">${esc(it.title)}</div>` : ''}</div>`;
+  }
   const [page, post] = String(w.story).split('_');
   const href = w.video_id ? `https://www.facebook.com/${page}/videos/${w.video_id}/` : `https://www.facebook.com/${page}/posts/${post}`;
   const src = w.video_id ? `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(href)}&show_text=0&width=300` : `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(href)}&width=300&show_text=0`;
