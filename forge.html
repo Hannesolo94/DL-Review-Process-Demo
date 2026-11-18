@@ -266,7 +266,7 @@ body.held .rail{top:var(--holdh,48px)} body.held #board, body.held .throw{opacit
     <div>
       <label class="small" for="throw-text">Anything not on the board. It goes into the Idea Library tagged with your name.</label>
       <div class="throwrow"><select id="throw-brand" aria-label="Brand"></select>
-      <textarea id="throw-text" placeholder="e.g. PLT: a Sheriff version once Police comes back, same card, county patrol footage"></textarea></div>
+      <textarea id="throw-text" placeholder="e.g. a new angle, a product you want pushed, a video you saw"></textarea></div>
     </div>
     <button id="throw-btn" type="button">Add idea</button>
     <div class="err" id="throw-err" role="alert"></div>
@@ -702,7 +702,6 @@ document.addEventListener('input', e => {          // Nov 10: the mock follows t
     if (CV()) { document.body.classList.add('client');
       document.querySelectorAll('nav.tabs, .rail, #p-flow, #p-fri, #p-wed, .lane').forEach(el => el.remove());
       const ft = document.querySelector('p.foot'); if (ft) ft.textContent = 'FORGE · live board · verdicts, notes, links and files save as you go and reach the DL Media team within the hour.';
-      const tt = document.getElementById('throw-text'); if (tt) tt.placeholder = 'Anything you want us to try next';
       const tl = document.querySelector('label[for="throw-text"]'); if (tl) tl.textContent = tl.textContent.replace('the Idea Library', 'the DL Media team'); }
     if (board.lane_text) { const ln = document.querySelector('.lane'); if (ln) { ln.hidden = false; ln.innerHTML = `<h3>Approvals</h3>${esc(board.lane_text)} Nothing builds until the approver says yes. Verdicts and notes go back to the Idea Library every hour.`; } }
     notes = (await SB.rpc('get_notes', { p_token:TOKEN }) || []).map(r => ({ id:r.id, kind:r.kind, asset_id:r.asset_id, author:r.author, body:r.body, state:r.state, x:r.x, y:r.y, img:r.img, link:r.link, headlines:r.headlines, primaries:r.primaries })).filter(n => n.kind !== 'open');
