@@ -139,6 +139,9 @@ code{font-family:var(--mono);font-size:13px}
 .brandgroup{margin-top:22px}
 .brandgroup>h3{font-family:var(--display);font-size:22px;letter-spacing:.04em;margin:0 0 8px;display:flex;gap:10px;align-items:baseline}
 .brandgroup>h3 small{font:400 12px var(--mono);color:var(--muted);letter-spacing:0}
+/* Nov 18 2026 (Emperor): one board per brand; cards grouped under data.sections / i.section, extra chips from i.tags, retired boards redirect */
+.secthead{font:600 13px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--ember);margin:18px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.secthead small{color:var(--muted);text-transform:none;letter-spacing:0;margin-left:8px}
 details.idea-acc{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:10px;overflow:hidden}
 details.idea-acc[open]{border-color:var(--ink)}
 details.idea-acc>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px}
@@ -658,6 +661,7 @@ function bodyOf(i){
 }
 
 function drawHold(){
+  if (board && board.superseded && board.superseded.link && !SOLO) { location.replace(board.superseded.link); return; }
   const h = board && board.hold, el = document.getElementById('holdbar'); if (!el) return;
   document.body.classList.toggle('held', !!h); el.hidden = !h;
   el.innerHTML = h ? `<b>NOT READY:</b> being fixed${h.why ? ' (' + esc(h.why) + ')' : ''}. You'll get a message when it passes.` : '';
@@ -673,17 +677,20 @@ function render(){
   document.getElementById('counts').innerHTML = `<span>${list.length} ideas</span><span>${tally.ok} approved</span><span>${tally.wait} waiting</span><span>${tally.chg} changes</span><span>${tally.kill} killed</span>`;
   const b = document.getElementById('board'); b.innerHTML = '';
   brands.forEach(br => { if (filt !== 'all' && filt !== br) return;
-    const items = list.filter(i => i.brand === br), appr = (board.approver || {})[br] || '';
+    const secOrd = (board.sections || []).map(x => x.label), secIx = i => { const k = secOrd.indexOf(i.section); return k < 0 ? 999 : k; };
+    const items = list.filter(i => i.brand === br).map((i, k) => [i, k]).sort((x, y) => secIx(x[0]) - secIx(y[0]) || x[1] - y[1]).map(x => x[0]), appr = (board.approver || {})[br] || '';
     const g = document.createElement('div'); g.className = 'brandgroup';
     g.innerHTML = `<h3>${esc(NAMES[br] || br)} <small>${items.length} ideas · ${esc(appr)} approves</small></h3>` +
       ((board.focus || {})[br] ? `<p class="focusline"><b>Focus:</b> ${esc(board.focus[br])}</p>` : '');
+    let lastSec = '';
     items.forEach(i => { const cur = stateOf(i), src = SRC[i.source] || ['t-h', i.source || 'Source'];
       const d = document.createElement('details'); d.className = 'idea-acc'; d.dataset.id = i.id; if (open.has(i.id)) d.open = true;
       d.innerHTML = `<summary><span class="chev" aria-hidden="true">›</span><div class="sum-main"><b>${i.n ? esc(i.n) + '. ' : ''}${esc(i.title)}</b><div class="sum-meta">
           <span class="state ${ST[cur][1]}">${cur === 'wait' ? 'Waiting on ' + esc(appr) : ST[cur][0]}</span>
-          <span class="tag ${src[0]}">${esc(src[1])}</span><span class="tag t-h">${esc(i.type || '')}</span>${i.persona ? `<span class="tag t-d">${esc(i.persona)}</span>` : ''}${i.refresh_of ? '<span class="tag t-x">Refresh</span>' : ''}${i.rolled_from ? (() => { const w = Math.max(1, Math.round((new Date(board.week) - new Date(String(i.rolled_from).slice(0, 10))) / 6048e5)) + 1;
+          <span class="tag ${src[0]}">${esc(src[1])}</span><span class="tag t-h">${esc(i.type || '')}</span>${i.persona ? `<span class="tag t-d">${esc(i.persona)}</span>` : ''}${(i.tags || []).map(t => `<span class="tag s-wait">${esc(t)}</span>`).join('')}${i.refresh_of ? '<span class="tag t-x">Refresh</span>' : ''}${i.rolled_from ? (() => { const w = Math.max(1, Math.round((new Date(board.week) - new Date(String(i.rolled_from).slice(0, 10))) / 6048e5)) + 1;
             return `<span class="tag ${w >= 3 ? 's-kill' : 't-c'}" title="First on the board the week of ${esc(String(i.rolled_from).slice(0, 10))}">On the board ${w} weeks</span>`; })() : ''}</div></div>
         <div class="sum-right">${ideaNotes(i.id).length} notes<br>${verdicts(i.id).length} verdicts</div></summary><div class="acc-body">${open.has(i.id) ? bodyOf(i) : ''}</div>`;
+      if (i.section && i.section !== lastSec) { lastSec = i.section; const h = document.createElement('h4'); h.className = 'secthead'; h.innerHTML = `${esc(i.section)} <small>${(n => n + (n === 1 ? ' card' : ' cards'))(items.filter(x => x.section === i.section).length)}</small>`; g.appendChild(h); }
       g.appendChild(d); });
     b.appendChild(g); });
   document.getElementById('throw-brand').innerHTML = brands.map(x => `<option value="${x}">${x}</option>`).join('');
