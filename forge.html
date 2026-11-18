@@ -499,7 +499,7 @@ const igUrl = h => 'https://www.instagram.com/' + encodeURIComponent(String(h).r
 function copyBox(i){
   if (!hasCopy(i)) return '';
   const mc = metaCopy(i), n = copyNotes(i.id).length, wl = /whitelist/i.test(i.type || '');
-  return `<div class="box copy"><h4>Meta copy <small>${mc.by ? 'edited by ' + esc(mc.by) + (n > 1 ? ' · ' + n + ' versions' : '') : 'first pass by Ahri'}</small></h4>
+  return `<div class="box copy"><h4>Meta copy <small>${mc.by ? 'edited by ' + esc(mc.by) + (n > 1 ? ' · ' + n + ' versions' : '') : 'first draft'}</small></h4>
       <span class="hint">The mock updates as you type. Save it and it's the copy that goes into the brief.${wl ? ' Whitelisted ads run with the primary only, leave the headline empty unless you want one.' : ''}</span>
       <div class="add"><label class="small" for="cph-${esc(i.id)}">Headline</label><input type="text" id="cph-${esc(i.id)}" data-cph="${esc(i.id)}" value="${esc(mc.headline)}" placeholder="${wl ? 'No headline (whitelisted)' : 'Headline'}">
       <label class="small" for="cpp-${esc(i.id)}">Primary text</label><textarea id="cpp-${esc(i.id)}" data-cpp="${esc(i.id)}" rows="4" placeholder="Primary text">${esc(mc.primary)}</textarea>
