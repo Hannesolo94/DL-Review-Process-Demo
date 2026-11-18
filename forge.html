@@ -252,27 +252,7 @@ body.held .rail{top:var(--holdh,48px)} body.held #board, body.held .throw{opacit
   <div class="meta" id="meta">Loading the board...</div>
 </header>
 
-<nav class="tabs" role="tablist" aria-label="FORGE sections">
-  <button role="tab" id="tab-board" aria-selected="true" aria-controls="p-board">The board</button>
-  <button role="tab" id="tab-flow" aria-selected="false" aria-controls="p-flow">How it flows</button>
-  <button role="tab" id="tab-fri" aria-selected="false" aria-controls="p-fri">Friday capture</button>
-  <button role="tab" id="tab-wed" aria-selected="false" aria-controls="p-wed">Wednesday client ask</button>
-</nav>
-
-<div class="rail" aria-label="Weekly stages">
-  <ol>
-    <li class="human"><b>Wed</b>Client ask</li>
-    <li class="human"><b>Fri</b>Capture skill</li>
-    <li class="auto"><b>Fri morning</b>FORGE builds the board</li>
-    <li class="human"><b>Mon</b>Ideas call</li>
-    <li class="human"><b>Mon / Tue</b>Dillon · David approve</li>
-    <li class="auto"><b>Hourly</b>Verdicts back to the Library</li>
-    <li><b>Then</b>Brief, CRAFT, launch</li>
-  </ol>
-  <div class="legend"><span><i class="dot" style="background:var(--ember)"></i>People decide</span><span><i class="dot" style="background:var(--src-x)"></i>Automated</span><span><i class="dot" style="background:var(--line)"></i>Existing process</span></div>
-</div>
-
-<section class="panel" id="p-board" role="tabpanel" aria-labelledby="tab-board">
+<section class="panel" id="p-board">
   <div class="bar">
     <h2>This week's ideas</h2>
     <div class="filters" role="group" aria-label="Filter by brand" id="filters"></div>
@@ -293,99 +273,9 @@ body.held .rail{top:var(--holdh,48px)} body.held #board, body.held .throw{opacit
     <div class="thrown" id="thrown"></div>
   </div>
 
-  <div class="lane">
-    <h3>Who approves what</h3>
-    Client brands (ATP, CTF, PLT) are approved by <b>Dillon</b>. Partner brands (TL, GU, OTX) sit on the same board but route to <b>David</b>. Nothing builds until the approver says yes. Verdicts and notes go back to the Idea Library every hour. BRT stays out of FORGE for now.
-  </div>
+  <div class="lane" hidden></div>
   <div class="donebar"><span id="donewho"></span><button id="done-btn" type="button">I'm done reviewing</button></div>
 </section>
-<section class="panel doc" id="p-flow" role="tabpanel" aria-labelledby="tab-flow" hidden>
-  <h2>The weekly FORGE loop</h2>
-  <p>People feed it first. The Ideas Library and the ad data only fill the gaps. Three human gates sit between an idea and a brief, so nothing moves on its own.</p>
-  <div class="diagram">
-    <svg viewBox="0 0 900 360" role="img" aria-labelledby="d1t"><title id="d1t">Weekly FORGE loop from client ask to brief cards</title>
-      <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ar"/></marker></defs>
-      <rect class="hu" x="20" y="30" width="150" height="64" rx="8"/><text class="hd" x="34" y="56">Wed · client ask</text><text class="sm" x="34" y="78">Brand owners' ideas</text>
-      <rect class="hu" x="20" y="130" width="150" height="64" rx="8"/><text class="hd" x="34" y="156">Fri · capture skill</text><text class="sm" x="34" y="178">Hannes + Dillon talk ideas</text>
-      <rect class="mo" x="20" y="230" width="150" height="64" rx="8"/><text class="hd" x="34" y="256">Ideas Library</text><text class="sm" x="34" y="278">+ ad data, gap fill</text>
-      <path class="ln" d="M170 62 H220 V150 H246" marker-end="url(#ah)"/>
-      <path class="ln" d="M170 162 H246" marker-end="url(#ah)"/>
-      <path class="ln" d="M170 262 H220 V174 H246" marker-end="url(#ah)"/>
-      <rect class="au" x="250" y="124" width="150" height="76" rx="8"/><text class="hd" x="264" y="152">FORGE board</text><text class="sm" x="264" y="172">Mock-ad cards</text><text class="sm" x="264" y="188">Source tag on each</text>
-      <path class="ln" d="M400 162 H436" marker-end="url(#ah)"/>
-      <rect class="hu" x="440" y="124" width="140" height="76" rx="8"/><text class="hd" x="454" y="152">Mon · ideas call</text><text class="sm" x="454" y="172">Hannes + Dillon</text><text class="sm" x="454" y="188">shape, merge, kill</text>
-      <path class="ln" d="M580 150 H610 V78 H636" marker-end="url(#ah)"/>
-      <path class="ln" d="M580 174 H610 V246 H636" marker-end="url(#ah)"/>
-      <rect class="hu" x="640" y="46" width="120" height="64" rx="8"/><text class="hd" x="652" y="72">Client brands</text><text class="sm" x="652" y="94">Dillon approves</text>
-      <rect class="hu" x="640" y="214" width="120" height="64" rx="8"/><text class="hd" x="652" y="240">Partner brands</text><text class="sm" x="652" y="262">David approves</text>
-      <path class="ln" d="M760 78 H790 V150 H806" marker-end="url(#ah)"/>
-      <path class="ln" d="M760 246 H790 V174 H806" marker-end="url(#ah)"/>
-      <rect class="au" x="810" y="118" width="80" height="88" rx="8"/><text class="hd" x="820" y="146">Auto</text><text class="hd" x="820" y="166">build</text><text class="sm" x="820" y="188">doc + cards</text>
-      <text class="sm" x="20" y="330">Killed ideas go back to the Ideas Library with Dillon's or David's reason. Kept ideas are tracked until the brief is built and assigned.</text>
-    </svg>
-  </div>
-
-  <h2>Where it sits in the monthly plan</h2>
-  <p>Today FORGE runs every week. Once the monthly plan starts, the big FORGE run moves to the last week of the month: it builds next month's plan, and once that is approved every brief in the plan gets built at once. The weekly loop stays as a smaller top-up for anything new mid-month.</p>
-  <div class="diagram">
-    <svg viewBox="0 0 900 400" role="img" aria-labelledby="d2t"><title id="d2t">FORGE inside the monthly creative process</title>
-      <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ar"/></marker></defs>
-      <rect class="mo" x="20" y="24" width="860" height="70" rx="10"/>
-      <text class="hd" x="36" y="52">Last week of the month · monthly FORGE run</text><text class="sm" x="36" y="74">Seed asks, capture, board, approvals for NEXT month, then the plan per brand and every brief in it built at once</text>
-      <path class="ln" d="M450 94 V122" marker-end="url(#ah2)"/>
-      <rect class="bx" x="20" y="126" width="860" height="176" rx="10"/>
-      <text class="hd" x="36" y="152">During the month · weekly top-up loop</text>
-      <rect class="hu" x="36" y="170" width="120" height="58" rx="8"/><text class="hd" x="48" y="194">Wed</text><text class="sm" x="48" y="214">Client ask</text>
-      <rect class="mo" x="170" y="170" width="120" height="58" rx="8"/><text class="hd" x="182" y="194">Thu</text><text class="sm" x="182" y="214">CS reports + CBO list</text>
-      <rect class="hu" x="304" y="170" width="120" height="58" rx="8"/><text class="hd" x="316" y="194">Fri</text><text class="sm" x="316" y="214">Capture skill</text>
-      <rect class="au" x="438" y="170" width="120" height="58" rx="8"/><text class="hd" x="450" y="194">FORGE</text><text class="sm" x="450" y="214">Board builds</text>
-      <rect class="hu" x="572" y="170" width="120" height="58" rx="8"/><text class="hd" x="584" y="194">Mon / Tue</text><text class="sm" x="584" y="214">Call + approvals</text>
-      <rect class="au" x="706" y="170" width="160" height="58" rx="8"/><text class="hd" x="718" y="194">Briefs</text><text class="sm" x="718" y="214">Cards, build, CRAFT</text>
-      <path class="ln" d="M156 199 H166" marker-end="url(#ah2)"/><path class="ln" d="M290 199 H300" marker-end="url(#ah2)"/><path class="ln" d="M424 199 H434" marker-end="url(#ah2)"/><path class="ln" d="M558 199 H568" marker-end="url(#ah2)"/><path class="ln" d="M692 199 H702" marker-end="url(#ah2)"/>
-      <text class="sm" x="36" y="262">Thursday's report feeds Friday: what won, what died, what the scaling CBO picked up. That evidence goes on the cards.</text>
-      <text class="sm" x="36" y="282">Ads go live after CRAFT and the client sign off, and show up in the next Thursday report.</text>
-      <path class="lnd" d="M786 302 V340 H110 V306" marker-end="url(#ah2)"/>
-      <rect class="mo" x="300" y="324" width="300" height="44" rx="8"/><text class="hd" x="316" y="351">Insights → Ideas Library</text>
-    </svg>
-  </div>
-
-  <h3>Human gates, on purpose</h3>
-  <ul>
-    <li><b>Seed first.</b> Client ideas (Wednesday) and our own (Friday) go on the board before anything the library or data suggests.</li>
-    <li><b>Every card shows where it came from:</b> Strategist, Dillon, David, Client, Library or Data.</li>
-    <li><b>Nothing auto-advances.</b> The Monday call shapes the board, Dillon approves client brands, David approves partner brands.</li>
-    <li><b>Guard:</b> a board can't go out unless every brand has at least one idea from a person, or is marked "no client input this cycle" so the gap shows.</li>
-  </ul>
-</section>
-<section class="panel doc" id="p-fri" role="tabpanel" aria-labelledby="tab-fri" hidden>
-  <h2>Friday capture skill</h2>
-  <p>A skill Hannes and Dillon each run with their own agent on Friday while they talk through ideas. It turns the conversation into FORGE cards and labels who said what.</p>
-  <div class="callout">
-    <b>What it asks for, per brand:</b> what's working and should get a new version, what's new (drops, designs, footage), anything from the Wednesday client replies, and any idea worth testing. It pulls last 30 days from Atria before suggesting a hook, so every card starts from what is actually winning.
-  </div>
-  <h3>What each captured card holds</h3>
-  <div class="tablewrap"><table class="mini">
-    <tr><th>Field</th><th>Example from this week</th></tr>
-    <tr><td>Brand + idea title</td><td>PLT · Firefighter design for firefighters</td></tr>
-    <tr><td>Source tag</td><td>Strategist (Hannes) · Dillon added the hotshot B-roll</td></tr>
-    <tr><td>Type</td><td>New idea / iteration of a winner / client request</td></tr>
-    <tr><td>Data line</td><td>No fire ad yet · desk mat build PLT0131 3.25 on $2,700</td></tr>
-    <tr><td>Hypothesis</td><td>If we ..., then ... will beat ..., because ...</td></tr>
-    <tr><td>Suggested hook</td><td>From the winning hook formats on Atria, last 30 days</td></tr>
-    <tr><td>Assets</td><td>Real files picked from the brand drives, linked</td></tr>
-    <tr><td>Approver</td><td>Dillon (client brands) or David (partner brands)</td></tr>
-  </table></div>
-  <p>The skill file is live at <code>~/.claude/skills/forge-capture/SKILL.md</code>; anything it captures lands in the Idea Library and on this board.</p>
-</section>
-<section class="panel doc" id="p-wed" role="tabpanel" aria-labelledby="tab-wed" hidden>
-  <h2>Wednesday client ask</h2>
-  <p>A short message to each brand contact, drafted every Wednesday so their ideas are in before Friday's capture. Drafts only, Hannes sends. Before this starts, Alex and Jahnavi decide if weekly is too much, too little or right.</p>
-  <div class="msg"><span class="to">#atp-creative-strategy · Alex B</span>Hey Alex, quick one for next week's ads: anything coming up we should know about? New designs, drops, events, content you've shot, or an idea you want us to try. Even a one-liner helps, we'll build it into the ideas for Monday.</div>
-  <div class="msg"><span class="to">#pltdaddy-creative-strategy · Cody</span>Hey Cody, quick one for next week's ads: anything coming up we should know about? New designs, drops, sales, content you've shot, or an idea you want us to try. Even a one-liner helps, we'll build it into the ideas for Monday.</div>
-  <div class="msg"><span class="to">#ctf-creative-strategy · Dave</span>Hey Dave, quick one for next week's ads: anything coming up we should know about? New designs, a new quote, shoots, or an idea you want us to try. Even a one-liner helps, we'll build it into the ideas for Monday.</div>
-  <div class="msg"><span class="to">Partner brands · Jordan (TL), Michael (OTX), GU via David</span>Same ask, sent through the brand channel, and the replies go on the board tagged Client so David sees them when he approves.</div>
-</section>
-
 <p class="foot" style="max-width:1700px;margin:0 auto;padding:0 20px 40px">FORGE · live board · verdicts, notes, links and files save to the shared database and reach the Idea Library within the hour.</p>
 </div>
 <script>
@@ -808,12 +698,13 @@ document.addEventListener('input', e => {          // Nov 10: the mock follows t
     document.title = 'FORGE ' + board.week + (laneName ? ' · ' + laneName : '');
     if (SOLO) { const si = (board.ideas || []).find(i => i.id === SOLO); document.body.classList.add('solo');
       if (si) document.title = 'FORGE mock · ' + si.brand + ' · ' + si.title; }
-    document.getElementById('meta').innerHTML = `Live board · <b>week of ${esc(board.week)}</b><br>${board.ideas.length} ideas · ${esc(board.lane_text || 'Dillon approves ATP, CTF, PLT · David approves TL, GU, OTX')}<br>Published ${esc(String(board.published || '').replace('T', ' '))}`;
+    document.getElementById('meta').innerHTML = `Live board · <b>week of ${esc(board.week)}</b><br>${board.ideas.length} ideas · ${esc(board.lane_text || '')}<br>Published ${esc(String(board.published || '').replace('T', ' '))}`;
     if (CV()) { document.body.classList.add('client');
       document.querySelectorAll('nav.tabs, .rail, #p-flow, #p-fri, #p-wed, .lane').forEach(el => el.remove());
       const ft = document.querySelector('p.foot'); if (ft) ft.textContent = 'FORGE · live board · verdicts, notes, links and files save as you go and reach the DL Media team within the hour.';
+      const tt = document.getElementById('throw-text'); if (tt) tt.placeholder = 'Anything you want us to try next';
       const tl = document.querySelector('label[for="throw-text"]'); if (tl) tl.textContent = tl.textContent.replace('the Idea Library', 'the DL Media team'); }
-    if (board.lane_text) { const ln = document.querySelector('.lane'); if (ln) ln.innerHTML = `<h3>Who approves</h3>${esc(board.lane_text)} Nothing builds until the approver says yes. Verdicts and notes go back to the Idea Library every hour.`; }
+    if (board.lane_text) { const ln = document.querySelector('.lane'); if (ln) { ln.hidden = false; ln.innerHTML = `<h3>Approvals</h3>${esc(board.lane_text)} Nothing builds until the approver says yes. Verdicts and notes go back to the Idea Library every hour.`; } }
     notes = (await SB.rpc('get_notes', { p_token:TOKEN }) || []).map(r => ({ id:r.id, kind:r.kind, asset_id:r.asset_id, author:r.author, body:r.body, state:r.state, x:r.x, y:r.y, img:r.img, link:r.link, headlines:r.headlines, primaries:r.primaries })).filter(n => n.kind !== 'open');
     render(); logOpen();
     if (!viewer) setTimeout(askName, 500);
