@@ -73,11 +73,30 @@ const au = (sep) => (AU ? `${sep}authuser=${encodeURIComponent(AU)}` : '');
 function Embed({ c, url }) {
   if (c.kind === 'drive') return <iframe className="pv-frame tall" src={`https://drive.google.com/file/d/${c.id}/preview${au('?')}`} allow="autoplay; fullscreen" allowFullScreen loading="lazy" title="Drive preview" />;
   if (c.kind === 'gdoc') return <iframe className="pv-frame" src={`https://docs.google.com/${c.doc}/d/${c.id}/preview${au('?')}`} loading="lazy" title="Google preview" />;
-  if (c.kind === 'drivefolder') return <iframe className="pv-frame folder" src={`https://drive.google.com/embeddedfolderview?id=${c.id}${au('&')}#grid`} loading="lazy" title="Drive folder" />;
+  if (c.kind === 'drivefolder') return <Folder c={c} url={url} />;
   if (c.kind === 'youtube') return <iframe className={'pv-frame ' + (c.short ? 'tall' : 'wide')} src={`https://www.youtube-nocookie.com/embed/${c.id}`} referrerPolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen loading="lazy" title="YouTube" />;
   if (c.kind === 'instagram') return <iframe className="pv-frame tall" src={`https://www.instagram.com/${c.t}/${c.id}/embed/`} referrerPolicy="strict-origin-when-cross-origin" loading="lazy" title="Instagram" />;
   if (c.kind === 'tiktok') return <iframe className="pv-frame tall" src={`https://www.tiktok.com/embed/v2/${c.id}`} referrerPolicy="strict-origin-when-cross-origin" allow="fullscreen" loading="lazy" title="TikTok" />;
   return null;
+}
+
+// Drive folders: the hub counts the files from Drive for desktop. Empty -> a dark note, files -> the grid,
+// unknown -> a dark card with Show files (Drive's own folder frame is white, so it only opens on request).
+function Folder({ c, url }) {
+  const m = useMeta(url, true); const [open, setOpen] = useState(false);
+  const n = m && m.site === 'drive-folder' && m.description ? parseInt(m.description, 10) : NaN;
+  const openUrl = `https://drive.google.com/drive/folders/${c.id}${au('?')}`;
+  if (n > 0 || open) return <iframe className="pv-frame folder" src={`https://drive.google.com/embeddedfolderview?id=${c.id}${au('&')}#grid`} loading="lazy" title="Drive folder" />;
+  return (
+    <div className="pv-folder" contentEditable={false}>
+      <span className="pv-ficon">📁</span>
+      <div className="pv-ct"><b>{(m && m.title) || 'Drive folder'}</b>
+        <span className="pv-host">{n === 0 ? 'Folder is empty for now' : 'File count not known yet'}</span></div>
+      <span className="grow" />
+      {n === 0 ? null : <button className="pv-btn" onClick={() => setOpen(true)}>Show files</button>}
+      <a className="pv-btn" href={openUrl} target="_blank" rel="noopener noreferrer">Open in Drive ↗</a>
+    </div>
+  );
 }
 
 function Card({ c, url, on }) {
@@ -89,7 +108,7 @@ function Card({ c, url, on }) {
       <div className="pv-ct">
         <b>{(m && m.title) || c.label || host}</b>
         {m && m.description ? <span className="pv-desc">{m.description}</span> : null}
-        <span className="pv-host">{host}{c.noembed ? ' · ' + c.noembed : ''}{!m || m.status === 'pending' ? ' · preview loads when the hub is on' : m.status === 'failed' ? ' · no preview from this site' : ''}</span>
+        <span className="pv-host">{host}{c.noembed ? ' · ' + c.noembed : ''}{!m || m.status === 'pending' ? ' · preview pending' : m.status === 'failed' ? ' · no preview from this site' : ''}</span>
       </div>
     </a>
   );

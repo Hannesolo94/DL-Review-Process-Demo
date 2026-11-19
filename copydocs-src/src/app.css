@@ -94,3 +94,7 @@ kbd{background:#232733;border:1px solid var(--line);border-radius:4px;padding:0 
 .pv-host{font-size:11px;color:#5d636e}
 .pv.link .pv-head{padding:6px 10px}
 @media (max-width:640px){.pv-head{flex-wrap:wrap}.pv-title{flex-basis:100%;order:3}.pv-card img,.pv-ph{width:80px;height:60px}}
+
+.pv-folder{display:flex;align-items:center;gap:12px;padding:12px;border-top:1px solid var(--line);background:#13161c}
+.pv-ficon{font-size:26px;line-height:1}
+@media (max-width:640px){.pv-folder{flex-wrap:wrap}}
