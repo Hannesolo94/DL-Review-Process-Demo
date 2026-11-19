@@ -151,18 +151,25 @@ export function linksIn(block) {
   else if (block.content && block.content.type === 'tableContent') block.content.rows.forEach((r) => r.cells.forEach((cell) => walk(Array.isArray(cell) ? cell : cell.content)));
   return out;
 }
+// Every block holding links gets a preview for each of them directly under it; a link used in two places gets one
+// in both (Nov 19 09:35). Previews already right after the block count; nothing is removed.
 export function addPreviews(editor, { only } = {}) {
-  const have = new Set(); const all = [];
-  const walk = (bs) => bs.forEach((b) => { all.push(b); if (b.type === 'linkPreview') have.add(b.props.url); walk(b.children || []); });
+  const jobs = [];
+  const walk = (bs) => {
+    for (let i = 0; i < bs.length; i++) {
+      const b = bs[i]; walk(b.children || []);
+      if (b.type === 'linkPreview') continue;
+      const attached = new Set(); let last = b, j = i + 1;
+      while (j < bs.length && bs[j].type === 'linkPreview') { attached.add(bs[j].props.url); last = bs[j]; j++; }
+      const ls = []; for (const l of linksIn(b)) { if (attached.has(l.url) || SKIP.test(l.url) || (only && !only(l.url))) continue; attached.add(l.url); ls.push(l); }
+      if (ls.length) jobs.push({ after: last, ls });
+    }
+  };
   walk(editor.document);
   let n = 0;
   editor.transact(() => {
-    for (const b of all) {
-      if (b.type === 'linkPreview') continue;
-      const ls = linksIn(b).filter((l) => !have.has(l.url) && !SKIP.test(l.url) && (!only || only(l.url)));
-      if (!ls.length) continue;
-      ls.forEach((l) => have.add(l.url));
-      editor.insertBlocks(ls.map((l) => ({ type: 'linkPreview', props: { url: l.url, title: l.text && l.text !== l.url ? l.text : '', mode: 'preview' } })), b, 'after');
+    for (const { after, ls } of jobs) {
+      editor.insertBlocks(ls.map((l) => ({ type: 'linkPreview', props: { url: l.url, title: l.text && l.text !== l.url ? l.text : '', mode: 'preview' } })), after, 'after');
       n += ls.length;
     }
   });

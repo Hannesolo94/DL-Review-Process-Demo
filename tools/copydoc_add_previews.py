@@ -26,23 +26,23 @@ def links(block):
 
 
 def add(blocks):
-    have = set()
-    def scan(bs):
-        for b in bs:
-            if b.get('type') == 'linkPreview': have.add(b.get('props', {}).get('url'))
-            scan(b.get('children', []))
-    scan(blocks)
+    """Every block that holds links gets a preview for each of them directly under it (Nov 19 09:35: a link used in
+    two places gets a preview in both). Previews already sitting right after the block count; nothing is removed."""
     n = 0
     def walk(bs):
         nonlocal n
-        out = []
-        for b in bs:
+        out, i = [], 0
+        while i < len(bs):
+            b = bs[i]
             if b.get('children'): b['children'] = walk(b['children'])
-            out.append(b)
+            out.append(b); i += 1
             if b.get('type') == 'linkPreview': continue
+            attached = set()
+            while i < len(bs) and bs[i].get('type') == 'linkPreview':   # previews already under this block
+                attached.add(bs[i].get('props', {}).get('url')); out.append(bs[i]); i += 1
             for url, text in links(b):
-                if url in have or SKIP.search(url): continue
-                have.add(url); n += 1
+                if url in attached or SKIP.search(url): continue
+                attached.add(url); n += 1
                 out.append({'id': str(uuid.uuid4()), 'type': 'linkPreview', 'props': {'url': url, 'title': text if text and text != url else '', 'mode': 'preview'}, 'children': []})
         return out
     return walk(blocks), n
