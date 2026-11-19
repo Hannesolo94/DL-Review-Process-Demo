@@ -122,6 +122,7 @@ function Editor({ doc }) {
     resolveFileUrl,
     tables: { splitCells: true, cellBackgroundColor: true, cellTextColor: true, headers: true },
   });
+  const initJson = useRef(null); if (initJson.current === null) initJson.current = JSON.stringify(editor.document);
 
   const save = useCallback(async (force) => {
     if (saving.current) { dirty.current = true; return; }
@@ -138,7 +139,10 @@ function Editor({ doc }) {
     if (dirty.current) { clearTimeout(timer.current); timer.current = setTimeout(() => save(), 600); }
   }, [editor, doc.id]);
 
-  const schedule = useCallback(() => { dirty.current = true; setStatus({ kind: 'editing' }); clearTimeout(timer.current); timer.current = setTimeout(() => save(), 900); }, [save]);
+  const lastJson = useRef(null);   // set from the freshly loaded doc on first change, so opening a doc never saves
+  const schedule = useCallback((ed) => {
+    if (ed && ed.document) { const j = JSON.stringify(ed.document); if (lastJson.current === null) lastJson.current = initJson.current; if (lastJson.current === j) return; lastJson.current = j; }
+    dirty.current = true; setStatus({ kind: 'editing' }); clearTimeout(timer.current); timer.current = setTimeout(() => save(), 900); }, [save]);
 
   useEffect(() => {
     const flush = () => { if (dirty.current) save(); };

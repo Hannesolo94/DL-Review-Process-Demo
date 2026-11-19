@@ -65,13 +65,18 @@ function useMeta(url, on) {
   return metaCache.get(url) || null;
 }
 
+// Drive picks the browser's first Google account unless told which; use the doc editor's own sign-in email (runtime only).
+let AU = '';
+sb.auth.getSession().then(({ data }) => { AU = (data.session && data.session.user.email) || ''; });
+const au = (sep) => (AU ? `${sep}authuser=${encodeURIComponent(AU)}` : '');
+
 function Embed({ c, url }) {
-  if (c.kind === 'drive') return <iframe className="pv-frame tall" src={`https://drive.google.com/file/d/${c.id}/preview`} allow="autoplay; fullscreen" allowFullScreen loading="lazy" title="Drive preview" />;
-  if (c.kind === 'gdoc') return <iframe className="pv-frame" src={`https://docs.google.com/${c.doc}/d/${c.id}/preview`} loading="lazy" title="Google preview" />;
-  if (c.kind === 'drivefolder') return <iframe className="pv-frame folder" src={`https://drive.google.com/embeddedfolderview?id=${c.id}#grid`} loading="lazy" title="Drive folder" />;
-  if (c.kind === 'youtube') return <iframe className={'pv-frame ' + (c.short ? 'tall' : 'wide')} src={`https://www.youtube-nocookie.com/embed/${c.id}`} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen loading="lazy" title="YouTube" />;
-  if (c.kind === 'instagram') return <iframe className="pv-frame tall" src={`https://www.instagram.com/${c.t}/${c.id}/embed/`} loading="lazy" title="Instagram" />;
-  if (c.kind === 'tiktok') return <iframe className="pv-frame tall" src={`https://www.tiktok.com/embed/v2/${c.id}`} allow="fullscreen" loading="lazy" title="TikTok" />;
+  if (c.kind === 'drive') return <iframe className="pv-frame tall" src={`https://drive.google.com/file/d/${c.id}/preview${au('?')}`} allow="autoplay; fullscreen" allowFullScreen loading="lazy" title="Drive preview" />;
+  if (c.kind === 'gdoc') return <iframe className="pv-frame" src={`https://docs.google.com/${c.doc}/d/${c.id}/preview${au('?')}`} loading="lazy" title="Google preview" />;
+  if (c.kind === 'drivefolder') return <iframe className="pv-frame folder" src={`https://drive.google.com/embeddedfolderview?id=${c.id}${au('&')}#grid`} loading="lazy" title="Drive folder" />;
+  if (c.kind === 'youtube') return <iframe className={'pv-frame ' + (c.short ? 'tall' : 'wide')} src={`https://www.youtube-nocookie.com/embed/${c.id}`} referrerPolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen loading="lazy" title="YouTube" />;
+  if (c.kind === 'instagram') return <iframe className="pv-frame tall" src={`https://www.instagram.com/${c.t}/${c.id}/embed/`} referrerPolicy="strict-origin-when-cross-origin" loading="lazy" title="Instagram" />;
+  if (c.kind === 'tiktok') return <iframe className="pv-frame tall" src={`https://www.tiktok.com/embed/v2/${c.id}`} referrerPolicy="strict-origin-when-cross-origin" allow="fullscreen" loading="lazy" title="TikTok" />;
   return null;
 }
 
@@ -96,7 +101,7 @@ function View({ block, editor }) {
   const c = classify(url) || { kind: 'card', label: url };
   const isEmbed = c.kind !== 'card';
   const set = (props) => editor.updateBlock(block, { props });
-  const openUrl = c.kind === 'drive' ? `https://drive.google.com/file/d/${c.id}/view` : url;
+  const openUrl = c.kind === 'drive' ? `https://drive.google.com/file/d/${c.id}/view${au('?')}` : c.kind === 'drivefolder' ? `https://drive.google.com/drive/folders/${c.id}${au('?')}` : url;
   return (
     <div className={'pv ' + mode} ref={ref} contentEditable={false}>
       <div className="pv-head">
