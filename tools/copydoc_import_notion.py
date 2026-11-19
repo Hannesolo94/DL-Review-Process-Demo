@@ -131,6 +131,7 @@ def conv(b):
         blk = {'type': 'paragraph', 'content': [{'type': 'text', 'text': f'[Notion {t} block not imported]', 'styles': {'italic': True}}]}
     if props: blk['props'] = props
     if kids: blk['children'] = kids
+    blk['id'] = str(uuid.uuid4())   # stable ids: toggle open/closed state is stored per block id
     return [blk]
 
 
@@ -147,7 +148,7 @@ def main():
     page = nget(f'/pages/{pid}')
     title = ''.join(r['plain_text'] for p in page['properties'].values() if p['type'] == 'title' for r in p['title']) or brief
     DOC_ID = replace or str(uuid.uuid4())
-    blocks = [{'type': 'quote', 'props': {'backgroundColor': 'gray'}, 'content': [
+    blocks = [{'id': str(uuid.uuid4()), 'type': 'quote', 'props': {'backgroundColor': 'gray'}, 'content': [
         {'type': 'text', 'text': 'Imported read-only from Notion on ' + time.strftime('%d %b %Y %H:%M') + '. ', 'styles': {}},
         {'type': 'link', 'href': page['url'], 'content': [{'type': 'text', 'text': 'Original in Notion', 'styles': {}}]}]}]
     blocks += convall(children(pid))
