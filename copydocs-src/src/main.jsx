@@ -33,11 +33,13 @@ function useSession() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const p = qs(); const hash = p.get('login');
+      // Nov 19 22:36: Slack turns '&' into '&amp;' in some pasted links, so 'login' arrived as 'amp;login' and David saw the
+      // gate. Take the token from anywhere in the URL. It is only redeemed here in JS, so link pre-fetch bots can't use it.
+      const p = qs(); const m = location.href.match(/[?&#;](?:amp;)?login=([A-Za-z0-9_-]{20,})/); const hash = p.get('login') || (m && m[1]);
       if (hash) {
         const { error } = await sb.auth.verifyOtp({ token_hash: hash, type: 'magiclink' });
-        p.delete('login'); const u = new URL(location.href); u.search = p.toString(); history.replaceState({}, '', u);
-        if (error && alive) setState((s) => ({ ...s, err: 'That sign-in link has expired or was already used. Open a fresh one from the hub.' }));
+        p.delete('login'); p.delete('amp;login'); const u = new URL(location.href); u.search = p.toString(); history.replaceState({}, '', u);
+        if (error && alive) setState((s) => ({ ...s, err: 'That sign-in link has expired or was already used. Ask Hannes for a fresh sign-in link.' }));
       }
       const { data } = await sb.auth.getSession();
       let editor = false;
@@ -57,7 +59,7 @@ function Gate({ err, signedInButNotEditor }) {
         <div className="logo">DL <span>COPY DOCS</span></div>
         {signedInButNotEditor
           ? <p>This account can't open copy docs.</p>
-          : <p>These are internal DL Media briefs. Sign in from the hub: <b>CRAFT → COPY DOCS → OPEN</b>. On your phone, do the same in the hub on your phone. After that, this browser stays signed in and brief links open straight away.</p>}
+          : <><p>These are internal DL Media briefs. To sign in, <b>ask Hannes for a fresh sign-in link</b> and open it in this browser. After that, this browser stays signed in and brief links open straight away.</p><p className="muted small">Hannes: CRAFT → COPY DOCS → OPEN in the hub.</p></>}
         {err && <p className="err">{err}</p>}
         {signedInButNotEditor && <button className="btn" onClick={() => sb.auth.signOut().then(() => location.reload())}>Sign out</button>}
       </div>
