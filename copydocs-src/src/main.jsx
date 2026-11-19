@@ -43,7 +43,7 @@ function Gate({ err, signedInButNotEditor }) {
         <div className="logo">DL <span>COPY DOCS</span></div>
         {signedInButNotEditor
           ? <p>This account can't open copy docs.</p>
-          : <p>These are internal DL Media briefs. Sign in from the hub: open <b>Copy docs</b> and press <b>Open editor</b> (or scan its QR code with your phone).</p>}
+          : <p>These are internal DL Media briefs. Sign in from the hub: <b>CRAFT → COPY DOCS → OPEN</b>. On your phone, do the same in the hub on your phone. After that, this browser stays signed in and brief links open straight away.</p>}
         {err && <p className="err">{err}</p>}
         {signedInButNotEditor && <button className="btn" onClick={() => sb.auth.signOut().then(() => location.reload())}>Sign out</button>}
       </div>
