@@ -15,6 +15,15 @@ const qs = () => new URLSearchParams(location.search);
 const go = (params) => { const u = new URL(location.href); u.search = new URLSearchParams(params).toString(); u.hash = ''; history.pushState({}, '', u); window.dispatchEvent(new Event('cd-nav')); };
 const fmt = (t) => { if (!t) return ''; const d = new Date(t); const now = new Date(); const same = d.toDateString() === now.toDateString();
   return same ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
+const IMG_MSG = 'Images live in Drive: paste the Drive link and it previews here.';
+function toast(msg) {
+  let t = document.getElementById('cd-toast');
+  if (!t) { t = document.createElement('div'); t.id = 'cd-toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+  t.textContent = msg; t.className = 'on'; clearTimeout(t._h); t._h = setTimeout(() => { t.className = ''; }, 4500);
+}
+// image files dropped anywhere on the page: blocked (capture phase, before the editor sees them)
+window.addEventListener('drop', (e) => { const fs = e.dataTransfer && [...e.dataTransfer.files]; if (fs && fs.some((f) => f.type.startsWith('image/'))) { e.preventDefault(); e.stopPropagation(); toast(IMG_MSG); } }, true);
+window.addEventListener('dragover', (e) => { if (e.dataTransfer && [...e.dataTransfer.items || []].some((i) => i.kind === 'file')) e.preventDefault(); }, true);
 const brandOf = (bn) => ((bn || '').match(/^[A-Za-z]+/) || [''])[0].toUpperCase();
 
 /* ---------------- auth ---------------- */
@@ -118,7 +127,20 @@ function Editor({ doc }) {
   const editor = useCreateBlockNote({
     schema,
     initialContent: Array.isArray(doc.content) && doc.content.length ? doc.content : undefined,
-    uploadFile: makeUploader(doc.id),
+    // Nov 19 08:48 (Hannes's rule: media stays in Drive, Supabase holds no media): uploads are OFF until the Drive
+    // path exists. makeUploader/the bucket stay in the code, unreachable from the UI. Image paste/drop shows a toast.
+    uploadFile: undefined,
+    pasteHandler: ({ event, editor: ed, defaultPasteHandler }) => {
+      const dt = event.clipboardData;
+      if (dt && [...dt.files].some((f) => f.type.startsWith('image/'))) { toast(IMG_MSG); return true; }
+      const text = ((dt && dt.getData('text/plain')) || '').trim();
+      if (/^https?:\/\/\S+$/.test(text) && !/notion\.(so|com|site)\//.test(text)) {   // a bare link: paste it, then drop its preview under it
+        const ok = defaultPasteHandler();
+        setTimeout(() => { try { const b = ed.getTextCursorPosition().block; ed.insertBlocks([{ type: 'linkPreview', props: { url: text, mode: 'preview' } }], b, 'after'); } catch (_) {} }, 0);
+        return ok;
+      }
+      return defaultPasteHandler();
+    },
     resolveFileUrl,
     tables: { splitCells: true, cellBackgroundColor: true, cellTextColor: true, headers: true },
   });
@@ -188,7 +210,7 @@ function Editor({ doc }) {
             onItemClick: () => { const url = (prompt('Paste the link to preview:') || '').trim(); if (url) insertOrUpdateBlockForSlashMenu(editor, { type: 'linkPreview', props: { url } }); },
           }], q)} />
         </BlockNoteView>
-        <p className="hint">Type <kbd>/</kbd> for blocks · <b>Previews</b> shows every link inside the doc · paste or drop images · drag the ⋮⋮ handle to move a block · select text to format</p>
+        <p className="hint">Type <kbd>/</kbd> for blocks · paste a Drive / YouTube / Instagram / TikTok / store link and it previews here · <b>Previews</b> adds one for every link · drag the ⋮⋮ handle to move a block · select text to format</p>
       </main>
       {showHist && <History docId={doc.id} onClose={() => setShowHist(false)} onRestore={restore} onSnapshot={async () => { const l = prompt('Name this version (optional):') ; if (l === null) return; await snapshot(l.trim() || 'manual'); }} />}
     </div>
