@@ -52,6 +52,8 @@ kbd{background:#232733;border:1px solid var(--line);border-radius:4px;padding:0 
   .page{padding-top:16px}
   .top{padding:8px 10px;gap:4px}
   .btn{padding:6px 9px}
+  .brief-in{width:74px}
+  .back{padding:4px 2px}
 }
 /* dark-friendly highlight + text colours (BlockNote's defaults are light pastel) */
 .bn-container [data-background-color=gray]{background-color:#2c2f36!important}

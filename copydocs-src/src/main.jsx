@@ -155,7 +155,7 @@ function Editor({ doc }) {
   };
 
   const label = status.kind === 'saving' ? 'Saving…' : status.kind === 'editing' ? 'Editing…' : status.kind === 'error' ? 'Not saved, retrying…'
-    : status.kind === 'conflict' ? 'Changed elsewhere, reload' : `Saved ${fmt(status.at)}`;
+    : status.kind === 'conflict' ? 'Changed elsewhere, reload' : <>Saved<span className="hide-sm"> {fmt(status.at)}</span></>;
 
   return (
     <div className="doc">
