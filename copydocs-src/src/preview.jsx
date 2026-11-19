@@ -50,8 +50,10 @@ function wantMeta(url) {
   metaCache.set(url, null); metaQ.add(url);
   clearTimeout(metaT); metaT = setTimeout(flushMeta, 150);
 }
+let SHARED = false;   // read-only share view: link data comes with the doc, never read or written here
+export function primeMeta(m) { SHARED = true; Object.entries(m || {}).forEach(([u, r]) => metaCache.set(u, r)); }
 async function flushMeta() {
-  const urls = [...metaQ]; metaQ = new Set(); if (!urls.length) return;
+  const urls = [...metaQ]; metaQ = new Set(); if (!urls.length || SHARED) return;
   const { data } = await sb.from('copy_link_meta').select('*').in('url', urls);
   const got = new Set((data || []).map((r) => r.url));
   (data || []).forEach((r) => metaCache.set(r.url, r));

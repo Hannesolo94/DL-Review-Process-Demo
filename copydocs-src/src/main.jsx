@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createRoot } from 'react-dom/client';
 import { useCreateBlockNote, SuggestionMenuController, getDefaultReactSlashMenuItems } from '@blocknote/react';
 import { BlockNoteSchema, defaultBlockSpecs, filterSuggestionItems, insertOrUpdateBlockForSlashMenu } from '@blocknote/core';
-import { LinkPreview, addPreviews } from './preview.jsx';
+import { LinkPreview, addPreviews, primeMeta } from './preview.jsx';
 
 const schema = BlockNoteSchema.create({ blockSpecs: { ...defaultBlockSpecs, linkPreview: LinkPreview() } });
 import { BlockNoteView } from '@blocknote/mantine';
@@ -326,6 +326,7 @@ function App() {
     sb.from('copy_docs').select('id').eq('brief_number', brief.toUpperCase()).eq('archived', false).order('updated_at', { ascending: false }).limit(1)
       .then(({ data }) => { if (data && data[0]) { const u = new URL(location.href); u.search = '?doc=' + data[0].id; history.replaceState({}, '', u); force((x) => x + 1); } else setBriefDoc('none'); });
   }, [brief, id, auth.editor]);
+  const share = p.get('share'); if (share) return <SharedView token={share} />;   // read-only link, no sign-in
   if (auth.loading) return <p className="muted pad">Loading…</p>;
   if (!auth.session) return <Gate err={auth.err} />;
   if (!auth.editor) return <Gate signedInButNotEditor />;
@@ -333,6 +334,35 @@ function App() {
   if (brief && briefDoc === 'none') return <div className="pad"><p>No copy doc for {brief.toUpperCase()} yet.</p><a href="?" onClick={(e) => { e.preventDefault(); go({}); }}>← All copy docs</a></div>;
   if (brief) return <p className="muted pad">Loading…</p>;
   return <DocList />;
+}
+
+/* ---------------- read-only share link (Nov 19 22:25) ---------------- */
+function SharedView({ token }) {
+  const [d, setD] = useState(null); const [err, setErr] = useState('');
+  useEffect(() => { sb.rpc('copy_doc_shared', { p_token: token }).then(({ data, error }) => {
+    if (error) setErr('Could not open this copy doc: ' + error.message);
+    else if (!data) setErr('This share link has expired or was turned off. Ask Hannes for a new one.');
+    else { primeMeta(data.meta); openTogglesByDefault(data.content); setD(data); } }); }, [token]);
+  if (err) return <div className="pad"><p className="err">{err}</p></div>;
+  if (!d) return <p className="muted pad">Loading…</p>;
+  return <SharedDoc d={d} />;
+}
+function SharedDoc({ d }) {
+  const editor = useCreateBlockNote({ schema, initialContent: Array.isArray(d.content) && d.content.length ? d.content : undefined, resolveFileUrl });
+  useEffect(() => { document.title = (d.brief_number ? d.brief_number + ' · ' : '') + 'Copy doc (read-only)'; }, [d]);
+  return (
+    <div className="doc">
+      <header className="top sticky">
+        {d.brief_number && <span className="pill">{d.brief_number}</span>}
+        <div className="grow" />
+        <span className="status">Read-only · updated {fmt(d.updated_at)}</span>
+      </header>
+      <main className="page">
+        <h1 className="title-in">{d.title}</h1>
+        <BlockNoteView editor={editor} theme="dark" editable={false} slashMenu={false} formattingToolbar={false} sideMenu={false} linkToolbar={false} />
+      </main>
+    </div>
+  );
 }
 
 createRoot(document.getElementById('root')).render(<App />);
