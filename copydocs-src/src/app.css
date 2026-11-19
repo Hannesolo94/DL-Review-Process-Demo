@@ -75,3 +75,22 @@ kbd{background:#232733;border:1px solid var(--line);border-radius:4px;padding:0 
 .bn-container [data-text-color=purple]{color:#b48cf0!important}
 .bn-container [data-text-color=pink]{color:#ef86c0!important}
 .bn-block-content[data-content-type=quote][data-background-color] blockquote{color:var(--text)}
+/* link previews (v1.1) */
+.pv{width:100%;border:1px solid var(--line);border-radius:10px;background:#13161c;margin:4px 0;overflow:hidden}
+.pv-head{display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:13px;min-width:0}
+.pv-tag{font-size:11px;font-weight:700;color:var(--acc2);background:#232733;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.pv-title{color:var(--text);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:0 1 auto}
+.pv-title:hover{text-decoration:underline}
+.pv-btn{background:transparent;border:1px solid var(--line);border-radius:6px;color:var(--muted);font:inherit;font-size:12px;padding:3px 8px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.pv-btn:hover{color:var(--text);border-color:#3a404c}
+.pv-frame{display:block;width:100%;border:0;border-top:1px solid var(--line);background:#000;height:420px}
+.pv-frame.tall{height:min(640px,80vh)}.pv-frame.wide{aspect-ratio:16/9;height:auto}.pv-frame.folder{height:340px;background:#fff}
+.pv-wait{padding:30px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+.pv-card{display:flex;gap:12px;align-items:center;padding:10px;border-top:1px solid var(--line);color:var(--text);text-decoration:none}
+.pv-card img,.pv-ph{width:120px;height:80px;object-fit:cover;border-radius:6px;flex:none;background:#232733}
+.pv-ph{display:grid;place-items:center;font-size:28px;font-weight:800;color:var(--muted)}
+.pv-ct{display:grid;gap:3px;min-width:0}.pv-ct b{font-size:14px}
+.pv-desc{font-size:12px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pv-host{font-size:11px;color:#5d636e}
+.pv.link .pv-head{padding:6px 10px}
+@media (max-width:640px){.pv-head{flex-wrap:wrap}.pv-title{flex-basis:100%;order:3}.pv-card img,.pv-ph{width:80px;height:60px}}

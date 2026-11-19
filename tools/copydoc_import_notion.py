@@ -144,6 +144,9 @@ def main():
         {'type': 'text', 'text': 'Imported read-only from Notion on ' + time.strftime('%d %b %Y %H:%M') + '. ', 'styles': {}},
         {'type': 'link', 'href': page['url'], 'content': [{'type': 'text', 'text': 'Original in Notion', 'styles': {}}]}]}]
     blocks += convall(children(pid))
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from copydoc_add_previews import add as add_previews   # v1.1: every original gets an in-doc preview
+    blocks, _ = add_previews(blocks)
     brand = re.match(r'[A-Z]+', brief).group(0)
     with psycopg.connect(DSN, autocommit=True) as c:
         if replace:

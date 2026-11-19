@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
-import { useCreateBlockNote } from '@blocknote/react';
+import { useCreateBlockNote, SuggestionMenuController, getDefaultReactSlashMenuItems } from '@blocknote/react';
+import { BlockNoteSchema, defaultBlockSpecs, filterSuggestionItems, insertOrUpdateBlockForSlashMenu } from '@blocknote/core';
+import { LinkPreview, addPreviews } from './preview.jsx';
+
+const schema = BlockNoteSchema.create({ blockSpecs: { ...defaultBlockSpecs, linkPreview: LinkPreview() } });
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/core/fonts/inter.css';
 import '@blocknote/mantine/style.css';
@@ -112,6 +116,7 @@ function Editor({ doc }) {
   const meta = useRef({ title: doc.title, brief: doc.brief_number || '' });
 
   const editor = useCreateBlockNote({
+    schema,
     initialContent: Array.isArray(doc.content) && doc.content.length ? doc.content : undefined,
     uploadFile: makeUploader(doc.id),
     resolveFileUrl,
@@ -166,14 +171,20 @@ function Editor({ doc }) {
         <span className={'status ' + status.kind} onClick={() => status.kind === 'conflict' && location.reload()}>{label}</span>
         <button className="btn ghost icon" title="Undo (Ctrl+Z)" onClick={() => editor.undo()}>↶</button>
         <button className="btn ghost icon" title="Redo (Ctrl+Shift+Z)" onClick={() => editor.redo()}>↷</button>
+        <button className="btn ghost" title="Add a preview under every link that doesn't have one yet" onClick={() => { const n = addPreviews(editor); if (!n) alert('Every link already has a preview.'); }}>Previews</button>
         <button className="btn ghost" onClick={() => setShowHist(true)}>History</button>
         <button className="btn ghost hide-sm" onClick={() => { navigator.clipboard.writeText(location.origin + location.pathname + '?doc=' + doc.id); }} title="Copy this doc's link (only signed-in editors can open it)">Copy link</button>
       </header>
       <main className="page">
 
         <input className="title-in" value={title} placeholder="Untitled" onChange={(e) => { setTitle(e.target.value); meta.current.title = e.target.value; schedule(); }} />
-        <BlockNoteView editor={editor} theme="dark" onChange={schedule} />
-        <p className="hint">Type <kbd>/</kbd> for blocks · paste or drop images · drag the ⋮⋮ handle to move a block · select text to format</p>
+        <BlockNoteView editor={editor} theme="dark" onChange={schedule} slashMenu={false}>
+          <SuggestionMenuController triggerCharacter="/" getItems={async (q) => filterSuggestionItems([...getDefaultReactSlashMenuItems(editor), {
+            title: 'Link preview', subtext: 'Preview a Drive file/folder, YouTube, Instagram, TikTok or any link', aliases: ['embed', 'preview', 'drive', 'link'], group: 'Media',
+            onItemClick: () => { const url = (prompt('Paste the link to preview:') || '').trim(); if (url) insertOrUpdateBlockForSlashMenu(editor, { type: 'linkPreview', props: { url } }); },
+          }], q)} />
+        </BlockNoteView>
+        <p className="hint">Type <kbd>/</kbd> for blocks · <b>Previews</b> shows every link inside the doc · paste or drop images · drag the ⋮⋮ handle to move a block · select text to format</p>
       </main>
       {showHist && <History docId={doc.id} onClose={() => setShowHist(false)} onRestore={restore} onSnapshot={async () => { const l = prompt('Name this version (optional):') ; if (l === null) return; await snapshot(l.trim() || 'manual'); }} />}
     </div>
