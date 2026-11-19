@@ -106,12 +106,26 @@ function DocList() {
 }
 
 /* ---------------- doc ---------------- */
+// Toggles open by default (Nov 19 09:46): BlockNote keeps each toggle's state in localStorage as toggle-<block id> and
+// treats "no entry" as closed, so a fresh viewer saw an almost empty doc. Seed "open" for every toggle this browser has
+// no state for; a toggle he closes stays closed.
+function openTogglesByDefault(blocks) {
+  const walk = (bs) => (bs || []).forEach((b) => {
+    if (b && b.id && (b.type === 'toggleListItem' || (b.type === 'heading' && b.props && b.props.isToggleable))) {
+      try { if (localStorage.getItem('toggle-' + b.id) === null) localStorage.setItem('toggle-' + b.id, 'true'); } catch (_) {}
+    }
+    walk(b && b.children);
+  });
+  walk(blocks);
+}
+
 function DocPage({ id }) {
   const [doc, setDoc] = useState(null); const [err, setErr] = useState('');
   useEffect(() => { sb.from('copy_docs').select('*').eq('id', id).maybeSingle().then(({ data, error }) => {
     if (error) setErr(error.message); else if (!data) setErr('Copy doc not found.'); else setDoc(data); }); }, [id]);
   if (err) return <div className="pad"><a href="?" onClick={(e) => { e.preventDefault(); go({}); }}>← All copy docs</a><p className="err">{err}</p></div>;
   if (!doc) return <p className="muted pad">Loading…</p>;
+  openTogglesByDefault(doc.content);
   return <Editor key={doc.id} doc={doc} />;
 }
 
