@@ -101,3 +101,11 @@ kbd{background:#232733;border:1px solid var(--line);border-radius:4px;padding:0 
 
 #cd-toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:99;background:#1c1f27;color:var(--text);border:1px solid #3a404c;border-radius:10px;padding:10px 16px;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.5);transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px)}
 #cd-toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* Nov 19 save banner */
+.status.auth{color:var(--bad)}.status.error,.status.conflict,.status.auth{font-weight:700}
+.banner{position:sticky;top:52px;z-index:20;margin:0;padding:12px 16px;font-size:15px;font-weight:600;line-height:1.45;border-bottom:2px solid}
+.banner.bad{background:#3a1215;color:#ffd7d9;border-color:#e5484d}
+.banner.warn{background:#33270c;color:#ffe7b3;border-color:#d39e2a}
+.banner-acts{display:inline-flex;gap:8px;margin-left:12px;flex-wrap:wrap}
+@media (max-width:640px){.banner{top:48px;font-size:14px}.banner-acts{display:flex;margin:8px 0 0}}

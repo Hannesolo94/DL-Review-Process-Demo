@@ -15,6 +15,7 @@ const qs = () => new URLSearchParams(location.search);
 const go = (params) => { const u = new URL(location.href); u.search = new URLSearchParams(params).toString(); u.hash = ''; history.pushState({}, '', u); window.dispatchEvent(new Event('cd-nav')); };
 const fmt = (t) => { if (!t) return ''; const d = new Date(t); const now = new Date(); const same = d.toDateString() === now.toDateString();
   return same ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
+const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, kk) => { o[kk] = x[kk]; return o; }, {}) : x));
 const IMG_MSG = 'Images live in Drive: paste the Drive link and it previews here.';
 function toast(msg) {
   let t = document.getElementById('cd-toast');
@@ -160,33 +161,71 @@ function Editor({ doc }) {
   });
   const initJson = useRef(null); if (initJson.current === null) initJson.current = JSON.stringify(editor.document);
 
+  // Nov 19 21:40 fix: Hannes lost ~1.5 h of edits. A save landed on the server but its answer never reached the tab,
+  // so every later save hit the stale updated_at lock, matched 0 rows and showed a tiny "Changed elsewhere".
+  // Now: 0 rows -> read the row; if it holds text this tab sent, carry on; if someone else wrote it, keep my text in
+  // History and show a big banner; a failed save shows a big NOT SAVED banner and keeps retrying; a copy of unsaved
+  // text stays on this device until the server confirms it.
+  const tried = useRef(new Set()); const retryMs = useRef(3000); const conflictRef = useRef(null);
+  const bkKey = 'cd-unsaved-' + doc.id;
+  const keepLocal = () => { try { localStorage.setItem(bkKey, JSON.stringify({ at: Date.now(), title: meta.current.title, content: editor.document })); } catch (_) {} };
+  const dropLocal = () => { try { localStorage.removeItem(bkKey); } catch (_) {} };
   const save = useCallback(async (force) => {
     if (saving.current) { dirty.current = true; return; }
     if (!dirty.current && !force) return;
-    saving.current = true; dirty.current = false; setStatus({ kind: 'saving' });
+    if (conflictRef.current && force !== 'mine') return;   // waiting for Hannes to pick reload or keep mine
+    saving.current = true; dirty.current = false; setStatus((st) => ({ ...st, kind: 'saving' }));
+    const content = editor.document; tried.current.add(canon(content));
     const bn = meta.current.brief.trim().toUpperCase() || null;
-    const { data, error } = await sb.from('copy_docs')
-      .update({ content: editor.document, title: meta.current.title.trim() || 'Untitled copy doc', brief_number: bn, brand: brandOf(bn) || null })
-      .eq('id', doc.id).eq('updated_at', lastAt.current).select('updated_at');
-    saving.current = false;
-    if (error) { dirty.current = true; setStatus({ kind: 'error', msg: error.message }); clearTimeout(timer.current); timer.current = setTimeout(() => save(), 4000); return; }
-    if (!data || !data.length) { setStatus({ kind: 'conflict' }); return; }
-    lastAt.current = data[0].updated_at; setStatus({ kind: 'saved', at: data[0].updated_at });
-    if (dirty.current) { clearTimeout(timer.current); timer.current = setTimeout(() => save(), 600); }
+    const again = (kind, msg) => { saving.current = false; dirty.current = true; setStatus({ kind, msg, at: lastAt.current });
+      clearTimeout(timer.current); timer.current = setTimeout(() => save(), retryMs.current); retryMs.current = Math.min(retryMs.current * 1.5, 20000); };
+    let res;
+    try { res = await sb.from('copy_docs')
+      .update({ content, title: meta.current.title.trim() || 'Untitled copy doc', brief_number: bn, brand: brandOf(bn) || null })
+      .eq('id', doc.id).eq('updated_at', lastAt.current).select('updated_at'); }
+    catch (e) { res = { error: { message: String((e && e.message) || e) } }; }
+    if (res.error) return again(/jwt|auth|401|403|permission/i.test(res.error.message + ' ' + (res.error.code || '')) ? 'auth' : 'error', res.error.message);
+    if (res.data && res.data.length) {
+      saving.current = false; lastAt.current = res.data[0].updated_at; tried.current.clear(); retryMs.current = 3000;
+      setStatus({ kind: 'saved', at: res.data[0].updated_at });
+      if (dirty.current) { clearTimeout(timer.current); timer.current = setTimeout(() => save(), 600); } else dropLocal();
+      return;
+    }
+    // 0 rows: our own earlier write landed (answer lost), someone else wrote, or this browser can't see the doc
+    let cur;
+    try { cur = await sb.from('copy_docs').select('updated_at,updated_by,content').eq('id', doc.id).maybeSingle(); }
+    catch (e) { cur = { error: { message: String((e && e.message) || e) } }; }
+    if (cur.error) return again('error', cur.error.message);
+    if (!cur.data) return again('auth', 'this browser cannot see the doc');
+    if (tried.current.has(canon(cur.data.content))) {   // it's text this tab sent: take the new lock and keep going
+      saving.current = false; lastAt.current = cur.data.updated_at; dirty.current = true; retryMs.current = 3000;
+      clearTimeout(timer.current); timer.current = setTimeout(() => save(), 50); return;
+    }
+    saving.current = false; dirty.current = true; conflictRef.current = cur.data;
+    const v = await sb.from('copy_doc_versions').insert({ doc_id: doc.id, title: meta.current.title, content: editor.document, label: 'my unsaved text (conflict)' });
+    setStatus({ kind: 'conflict', at: cur.data.updated_at, by: cur.data.updated_by, kept: !v.error });
   }, [editor, doc.id]);
+  const keepMine = () => { const c = conflictRef.current; if (!c) return; lastAt.current = c.updated_at; conflictRef.current = null; dirty.current = true; save('mine'); };
 
   const lastJson = useRef(null);   // set from the freshly loaded doc on first change, so opening a doc never saves
   const schedule = useCallback((ed) => {
     if (ed && ed.document) { const j = JSON.stringify(ed.document); if (lastJson.current === null) lastJson.current = initJson.current; if (lastJson.current === j) return; lastJson.current = j; }
-    dirty.current = true; setStatus({ kind: 'editing' }); clearTimeout(timer.current); timer.current = setTimeout(() => save(), 900); }, [save]);
+    dirty.current = true; keepLocal(); if (!conflictRef.current) setStatus((st) => (st.kind === 'error' || st.kind === 'auth' ? st : { kind: 'editing', at: lastAt.current }));
+    clearTimeout(timer.current); timer.current = setTimeout(() => save(), 900); }, [save]);
 
   useEffect(() => {
     const flush = () => { if (dirty.current) save(); };
     const warn = (e) => { if (dirty.current || saving.current) { e.preventDefault(); e.returnValue = ''; flush(); } };
-    document.addEventListener('visibilitychange', flush); window.addEventListener('beforeunload', warn);
-    return () => { document.removeEventListener('visibilitychange', flush); window.removeEventListener('beforeunload', warn); clearTimeout(timer.current); };
+    const online = () => { if (dirty.current) { retryMs.current = 3000; save(); } };
+    document.addEventListener('visibilitychange', flush); window.addEventListener('beforeunload', warn); window.addEventListener('online', online);
+    return () => { document.removeEventListener('visibilitychange', flush); window.removeEventListener('beforeunload', warn); window.removeEventListener('online', online); clearTimeout(timer.current); };
   }, [save]);
 
+  const [offer, setOffer] = useState(() => { try { const b = JSON.parse(localStorage.getItem('cd-unsaved-' + doc.id) || 'null');
+    return b && Array.isArray(b.content) && canon(b.content) !== canon(doc.content) ? b : null; } catch (_) { return null; } });
+  const useOffer = async () => { const b = offer; setOffer(null); await snapshot('before restoring device copy');
+    editor.replaceBlocks(editor.document, b.content.length ? b.content : [{ type: 'paragraph' }]);
+    if (b.title) { setTitle(b.title); meta.current.title = b.title; } schedule(); };
   const snapshot = async (label) => {
     const { error } = await sb.from('copy_doc_versions').insert({ doc_id: doc.id, title: meta.current.title, content: editor.document, label });
     if (error) alert(error.message);
@@ -199,8 +238,14 @@ function Editor({ doc }) {
     schedule(); setShowHist(false);
   };
 
-  const label = status.kind === 'saving' ? 'Saving…' : status.kind === 'editing' ? 'Editing…' : status.kind === 'error' ? 'Not saved, retrying…'
-    : status.kind === 'conflict' ? 'Changed elsewhere, reload' : <>Saved<span className="hide-sm"> {fmt(status.at)}</span></>;
+  const hm = (t) => (t ? new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '');
+  const label = status.kind === 'saving' ? 'Saving…' : status.kind === 'editing' ? 'Editing…'
+    : status.kind === 'error' || status.kind === 'auth' || status.kind === 'conflict' ? 'NOT SAVED' : `Saved ${hm(status.at)}`;
+  const banner = status.kind === 'error' ? <>NOT SAVED: your last changes haven't reached the server ({status.msg}). Retrying by itself; keep this tab open. A copy is kept on this device.</>
+    : status.kind === 'auth' ? <>NOT SAVED: this browser is signed out. Sign in again from the hub (CRAFT → COPY DOCS → OPEN) in another tab; this tab keeps retrying and keeps a copy on this device.</>
+    : status.kind === 'conflict' ? <>NOT SAVED: someone else changed this doc at {hm(status.at)}{status.by ? ` (${status.by})` : ''}. {status.kept ? 'Your text is safe in History as "my unsaved text (conflict)".' : 'Copy your text somewhere before reloading.'}
+        <span className="banner-acts"><button className="btn" onClick={() => { dropLocal(); location.reload(); }}>Reload to see theirs</button><button className="btn ghost" onClick={keepMine}>Keep mine (overwrite theirs)</button></span></>
+    : null;
 
   return (
     <div className="doc">
@@ -208,13 +253,15 @@ function Editor({ doc }) {
         <a className="back" href="?" onClick={(e) => { e.preventDefault(); save(); go({}); }}>←<span className="hide-sm"> All docs</span></a>
         <input className="brief-in" value={brief} placeholder="Brief #" onChange={(e) => { setBrief(e.target.value); meta.current.brief = e.target.value; schedule(); }} />
         <div className="grow" />
-        <span className={'status ' + status.kind} onClick={() => status.kind === 'conflict' && location.reload()}>{label}</span>
+        <span className={'status ' + status.kind}>{label}</span>
         <button className="btn ghost icon" title="Undo (Ctrl+Z)" onClick={() => editor.undo()}>↶</button>
         <button className="btn ghost icon" title="Redo (Ctrl+Shift+Z)" onClick={() => editor.redo()}>↷</button>
         <button className="btn ghost" title="Add a preview under every link that doesn't have one yet" onClick={() => { const n = addPreviews(editor); if (!n) alert('Every link already has a preview.'); }}>Previews</button>
         <button className="btn ghost" onClick={() => setShowHist(true)}>History</button>
         <button className="btn ghost hide-sm" onClick={() => { navigator.clipboard.writeText(location.origin + location.pathname + '?doc=' + doc.id); }} title="Copy this doc's link (only signed-in editors can open it)">Copy link</button>
       </header>
+      {banner && <div className="banner bad" role="alert">{banner}</div>}
+      {offer && !banner && <div className="banner warn" role="alert">This device has text from {hm(offer.at)} that never reached the server.<span className="banner-acts"><button className="btn" onClick={useOffer}>Restore it</button><button className="btn ghost" onClick={() => { dropLocal(); setOffer(null); }}>Discard</button></span></div>}
       <main className="page">
 
         <input className="title-in" value={title} placeholder="Untitled" onChange={(e) => { setTitle(e.target.value); meta.current.title = e.target.value; schedule(); }} />
