@@ -207,18 +207,30 @@ function Editor({ doc }) {
   }, [editor, doc.id]);
   const keepMine = () => { const c = conflictRef.current; if (!c) return; lastAt.current = c.updated_at; conflictRef.current = null; dirty.current = true; save('mine'); };
 
+  // Nov 19 21:41 (Hannes): "an auto saver that every minute will save the doc until there is no activity for a time".
+  // Typing non-stop keeps pushing the 900 ms save back, so while there were edits in the last 5 min a save is forced
+  // every 60 s. After 5 min with no edits it goes quiet until the next keystroke. Versions: the DB trigger keeps one
+  // at most every 10 min of changes.
+  const lastEdit = useRef(0);
+  useEffect(() => {
+    const beat = setInterval(() => {
+      if (Date.now() - lastEdit.current < 5 * 60000 && dirty.current && !saving.current && !conflictRef.current) save();
+    }, 60000);
+    return () => clearInterval(beat);
+  }, [save]);
+
   const lastJson = useRef(null);   // set from the freshly loaded doc on first change, so opening a doc never saves
   const schedule = useCallback((ed) => {
     if (ed && ed.document) { const j = JSON.stringify(ed.document); if (lastJson.current === null) lastJson.current = initJson.current; if (lastJson.current === j) return; lastJson.current = j; }
-    dirty.current = true; keepLocal(); if (!conflictRef.current) setStatus((st) => (st.kind === 'error' || st.kind === 'auth' ? st : { kind: 'editing', at: lastAt.current }));
+    dirty.current = true; lastEdit.current = Date.now(); keepLocal(); if (!conflictRef.current) setStatus((st) => (st.kind === 'error' || st.kind === 'auth' ? st : { kind: 'editing', at: lastAt.current }));
     clearTimeout(timer.current); timer.current = setTimeout(() => save(), 900); }, [save]);
 
   useEffect(() => {
     const flush = () => { if (dirty.current) save(); };
     const warn = (e) => { if (dirty.current || saving.current) { e.preventDefault(); e.returnValue = ''; flush(); } };
     const online = () => { if (dirty.current) { retryMs.current = 3000; save(); } };
-    document.addEventListener('visibilitychange', flush); window.addEventListener('beforeunload', warn); window.addEventListener('online', online);
-    return () => { document.removeEventListener('visibilitychange', flush); window.removeEventListener('beforeunload', warn); window.removeEventListener('online', online); clearTimeout(timer.current); };
+    document.addEventListener('visibilitychange', flush); window.addEventListener('beforeunload', warn); window.addEventListener('online', online); window.addEventListener('pagehide', flush);
+    return () => { document.removeEventListener('visibilitychange', flush); window.removeEventListener('beforeunload', warn); window.removeEventListener('online', online); window.removeEventListener('pagehide', flush); clearTimeout(timer.current); };
   }, [save]);
 
   const [offer, setOffer] = useState(() => { try { const b = JSON.parse(localStorage.getItem('cd-unsaved-' + doc.id) || 'null');
