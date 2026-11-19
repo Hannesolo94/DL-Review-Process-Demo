@@ -29,22 +29,37 @@ const brandOf = (bn) => ((bn || '').match(/^[A-Za-z]+/) || [''])[0].toUpperCase(
 
 /* ---------------- auth ---------------- */
 function useSession() {
-  const [state, setState] = useState({ loading: true, session: null, editor: false, err: '' });
+  const [state, setState] = useState({ loading: true, session: null, editor: false, err: '', switchTo: null });
   useEffect(() => {
     let alive = true;
+    const strip = (...keys) => { const p = qs(); keys.forEach((k) => { p.delete(k); p.delete('amp;' + k); }); const u = new URL(location.href); u.search = p.toString(); history.replaceState({}, '', u); };
+    const grab = (k) => { const m = location.href.match(new RegExp('[?&#;](?:amp;)?' + k + '=([A-Za-z0-9_-]{20,})')); return qs().get(k) || (m && m[1]); };
     (async () => {
-      // Nov 19 22:36: Slack turns '&' into '&amp;' in some pasted links, so 'login' arrived as 'amp;login' and David saw the
-      // gate. Take the token from anywhere in the URL. It is only redeemed here in JS, so link pre-fetch bots can't use it.
-      const p = qs(); const m = location.href.match(/[?&#;](?:amp;)?login=([A-Za-z0-9_-]{20,})/); const hash = p.get('login') || (m && m[1]);
+      let err = '';
+      // Hub one-time link (Hannes): always signs this browser in as the link's owner.
+      // Slack can turn '&' into '&amp;', so the token is taken from anywhere in the URL; only this code redeems it.
+      const hash = grab('login');
       if (hash) {
         const { error } = await sb.auth.verifyOtp({ token_hash: hash, type: 'magiclink' });
-        p.delete('login'); p.delete('amp;login'); const u = new URL(location.href); u.search = p.toString(); history.replaceState({}, '', u);
-        if (error && alive) setState((s) => ({ ...s, err: 'That sign-in link has expired or was already used. Ask Hannes for a fresh sign-in link.' }));
+        strip('login');
+        if (error) err = 'That sign-in link has expired or was already used. Ask Hannes for a fresh sign-in link.';
+      }
+      // Personal invite (?invite=, 30 days, several uses): the server mints a fresh one-time token each time.
+      const inv = grab('invite');
+      if (inv) {
+        strip('invite');
+        const { data: cur } = await sb.auth.getSession();
+        const { data: who } = await sb.rpc('copy_doc_invite_email', { p_token: inv });
+        const mine = cur.session && who && cur.session.user.email.toLowerCase() === who.toLowerCase();
+        if (!who) { if (!cur.session) err = 'This sign-in link has expired or was turned off. Ask Hannes for a new one.'; }
+        else if (mine) { /* already signed in as this person: nothing to do */ }
+        else if (cur.session) { if (alive) setState((s) => ({ ...s, loading: false, session: cur.session, switchTo: { inv, who, cur: cur.session.user.email } })); return; }
+        else err = await redeemInvite(inv);
       }
       const { data } = await sb.auth.getSession();
       let editor = false;
       if (data.session) { const r = await sb.rpc('is_copy_editor'); editor = r.data === true; }
-      if (alive) setState((s) => ({ ...s, loading: false, session: data.session, editor }));
+      if (alive) setState((s) => ({ ...s, loading: false, session: data.session, editor, err, switchTo: null }));
     })();
     const { data: sub } = sb.auth.onAuthStateChange((_e, session) => { if (!session) setState((s) => ({ ...s, session: null, editor: false })); });
     return () => { alive = false; sub.subscription.unsubscribe(); };
@@ -52,14 +67,57 @@ function useSession() {
   return state;
 }
 
-function Gate({ err, signedInButNotEditor }) {
+function useMe() { const [me, setMe] = useState(''); useEffect(() => { sb.auth.getSession().then(({ data }) => setMe((data.session && data.session.user.email) || '')); }, []); return me; }
+
+async function redeemInvite(inv) {
+  for (let i = 0; i < 2; i++) {   // a second try covers a token that raced with another tab
+    const { data: th, error } = await sb.rpc('copy_doc_redeem_invite', { p_token: inv });
+    if (error) return 'Could not sign in: ' + error.message;
+    if (!th) return 'This sign-in link has expired or was turned off. Ask Hannes for a new one.';
+    const v = await sb.auth.verifyOtp({ token_hash: th, type: 'magiclink' });
+    if (!v.error) return '';
+  }
+  return 'Sign-in didn’t go through. Open the link again, or ask Hannes for a new one.';
+}
+
+function SwitchGate({ sw }) {
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
+  const go2 = async () => { setBusy(true); await sb.auth.signOut(); const e = await redeemInvite(sw.inv); if (e) { setErr(e); setBusy(false); } else location.reload(); };
+  return (
+    <div className="gate"><div className="gate-card">
+      <div className="logo">DL <span>COPY DOCS</span></div>
+      <p>This sign-in link is for <b>{sw.who}</b>, but this browser is signed in as <b>{sw.cur}</b>.</p>
+      <p className="muted small">If this is your browser, keep your own account. Only switch if you are {sw.who}.</p>
+      {err && <p className="err">{err}</p>}
+      <div className="banner-acts" style={{ margin: 0 }}>
+        <button className="btn primary" onClick={() => { location.reload(); }} disabled={busy}>Keep {sw.cur}</button>
+        <button className="btn ghost" onClick={go2} disabled={busy}>Switch to {sw.who}</button>
+      </div>
+    </div></div>
+  );
+}
+
+function RequestLink() {
+  const [email, setEmail] = useState(''); const [sent, setSent] = useState(false);
+  if (sent) return <p className="muted small">Thanks. If that email is on the list, Hannes gets your request in his hub and will send you a personal sign-in link.</p>;
+  return (
+    <form className="req" onSubmit={async (e) => { e.preventDefault(); if (!email.trim()) return; await sb.rpc('copy_doc_request_link', { p_email: email.trim() }); setSent(true); }}>
+      <input className="search" type="email" placeholder="your work email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <button className="btn" type="submit">Request a sign-in link</button>
+    </form>
+  );
+}
+
+function Gate({ err, signedInButNotEditor, email }) {
   return (
     <div className="gate">
       <div className="gate-card">
         <div className="logo">DL <span>COPY DOCS</span></div>
         {signedInButNotEditor
-          ? <p>This account can't open copy docs.</p>
-          : <><p>These are internal DL Media briefs. To sign in, <b>ask Hannes for a fresh sign-in link</b> and open it in this browser. After that, this browser stays signed in and brief links open straight away.</p><p className="muted small">Hannes: CRAFT → COPY DOCS → OPEN in the hub.</p></>}
+          ? <p>This account{email ? <> (<b>{email}</b>)</> : ''} can't open copy docs.</p>
+          : <><p>These are internal DL Media briefs. To sign in, open the <b>personal sign-in link</b> Hannes sent you, in this browser. After that, this browser stays signed in and brief links open straight away.</p>
+              <RequestLink />
+              <p className="muted small">Hannes: CRAFT → COPY DOCS → OPEN in the hub.</p></>}
         {err && <p className="err">{err}</p>}
         {signedInButNotEditor && <button className="btn" onClick={() => sb.auth.signOut().then(() => location.reload())}>Sign out</button>}
       </div>
@@ -69,6 +127,7 @@ function Gate({ err, signedInButNotEditor }) {
 
 /* ---------------- list ---------------- */
 function DocList() {
+  const me = useMe();
   const [docs, setDocs] = useState(null); const [q, setQ] = useState(''); const [err, setErr] = useState('');
   useEffect(() => { sb.from('copy_docs').select('id,brief_number,brand,title,updated_at,updated_by,source').eq('archived', false).order('updated_at', { ascending: false })
     .then(({ data, error }) => { if (error) setErr(error.message); setDocs(data || []); }); }, []);
@@ -86,6 +145,7 @@ function DocList() {
       <header className="top">
         <div className="logo">DL <span>COPY DOCS</span></div>
         <div className="grow" />
+        <span className="muted small hide-sm">{me}</span>
         <button className="btn ghost" onClick={() => sb.auth.signOut().then(() => location.reload())}>Sign out</button>
       </header>
       <div className="list-tools">
@@ -133,6 +193,7 @@ function DocPage({ id }) {
 }
 
 function Editor({ doc }) {
+  const me = useMe();
   const [title, setTitle] = useState(doc.title);
   const [brief, setBrief] = useState(doc.brief_number || '');
   const [status, setStatus] = useState({ kind: 'saved', at: doc.updated_at });
@@ -267,6 +328,7 @@ function Editor({ doc }) {
         <a className="back" href="?" onClick={(e) => { e.preventDefault(); save(); go({}); }}>←<span className="hide-sm"> All docs</span></a>
         <input className="brief-in" value={brief} placeholder="Brief #" onChange={(e) => { setBrief(e.target.value); meta.current.brief = e.target.value; schedule(); }} />
         <div className="grow" />
+        <span className="muted small hide-sm" title="Signed in as">{me}</span>
         <span className={'status ' + status.kind}>{label}</span>
         <button className="btn ghost icon" title="Undo (Ctrl+Z)" onClick={() => editor.undo()}>↶</button>
         <button className="btn ghost icon" title="Redo (Ctrl+Shift+Z)" onClick={() => editor.redo()}>↷</button>
@@ -322,7 +384,7 @@ function App() {
   useEffect(() => { const f = () => force((x) => x + 1); window.addEventListener('popstate', f); window.addEventListener('cd-nav', f);
     return () => { window.removeEventListener('popstate', f); window.removeEventListener('cd-nav', f); }; }, []);
   const [briefDoc, setBriefDoc] = useState(null);
-  const p = qs(); const id = p.get('doc'); const brief = p.get('brief');
+  const p = qs(); const id = p.get('doc') || p.get('amp;doc'); const brief = p.get('brief') || p.get('amp;brief');   // Slack may send &amp;
   useEffect(() => {
     if (!brief || id || !auth.editor) return;
     sb.from('copy_docs').select('id').eq('brief_number', brief.toUpperCase()).eq('archived', false).order('updated_at', { ascending: false }).limit(1)
@@ -330,8 +392,9 @@ function App() {
   }, [brief, id, auth.editor]);
   const share = p.get('share'); if (share) return <SharedView token={share} />;   // read-only link, no sign-in
   if (auth.loading) return <p className="muted pad">Loading…</p>;
+  if (auth.switchTo) return <SwitchGate sw={auth.switchTo} />;
   if (!auth.session) return <Gate err={auth.err} />;
-  if (!auth.editor) return <Gate signedInButNotEditor />;
+  if (!auth.editor) return <Gate signedInButNotEditor email={auth.session.user.email} />;
   if (id) return <DocPage id={id} />;
   if (brief && briefDoc === 'none') return <div className="pad"><p>No copy doc for {brief.toUpperCase()} yet.</p><a href="?" onClick={(e) => { e.preventDefault(); go({}); }}>← All copy docs</a></div>;
   if (brief) return <p className="muted pad">Loading…</p>;

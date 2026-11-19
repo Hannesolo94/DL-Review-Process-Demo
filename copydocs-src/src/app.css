@@ -109,3 +109,6 @@ kbd{background:#232733;border:1px solid var(--line);border-radius:4px;padding:0 
 .banner.warn{background:#33270c;color:#ffe7b3;border-color:#d39e2a}
 .banner-acts{display:inline-flex;gap:8px;margin-left:12px;flex-wrap:wrap}
 @media (max-width:640px){.banner{top:48px;font-size:14px}.banner-acts{display:flex;margin:8px 0 0}}
+
+/* Nov 19 invites */
+.req{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}.req .search{flex:1;min-width:180px}
