@@ -1,0 +1,75 @@
+:root{--bg:#0e1014;--panel:#161920;--line:#262a33;--text:#e6e8ec;--muted:#8b919c;--acc:#d4a24c;--acc2:#e7b965;--ok:#5fbf7f;--bad:#e06c6c}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;margin:0}
+a{color:var(--acc2)}
+.muted{color:var(--muted)} .small{font-size:12px} .pad{padding:24px 16px} .err{color:var(--bad)} .grow{flex:1}
+.logo{font-weight:800;letter-spacing:.08em;font-size:14px}.logo span{color:var(--acc);font-weight:600}
+.btn{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:#3a404c}.btn.primary{background:var(--acc);border-color:var(--acc);color:#16120a;font-weight:600}.btn.primary:hover{background:var(--acc2)}
+.btn.ghost{background:transparent}.btn.icon{padding:5px 9px;font-size:16px;line-height:1}.btn.full{width:100%;margin:6px 0}
+.pill{display:inline-block;background:#232733;border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;font-weight:600;color:var(--acc2);white-space:nowrap}
+.pill.small{font-size:11px;padding:1px 7px;color:var(--muted)}
+.top{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);background:rgba(14,16,20,.92);backdrop-filter:blur(8px)}
+.top.sticky{position:sticky;top:0;z-index:20}
+.back{text-decoration:none;color:var(--text);font-size:14px;padding:4px 6px}
+.brief-in{background:transparent;border:1px solid transparent;border-radius:6px;color:var(--acc2);font:inherit;font-weight:700;font-size:13px;width:92px;padding:4px 6px;text-transform:uppercase}
+.brief-in:hover,.brief-in:focus{border-color:var(--line);outline:none}
+.status{font-size:12px;color:var(--muted);white-space:nowrap;margin-right:4px}
+.status.saved{color:var(--ok)}.status.error,.status.conflict{color:var(--bad);cursor:pointer}
+.page{max-width:900px;margin:0 auto;padding:28px 0 120px}
+.title-in{display:block;width:100%;background:transparent;border:0;color:var(--text);font:inherit;font-size:34px;font-weight:800;padding:0 54px;margin:6px 0 14px;outline:none}
+.note{margin:0 54px 14px;padding:8px 12px;border:1px solid #3a3220;background:#1c1912;border-radius:8px;font-size:12px;color:#d9c79e}
+.hint{color:#5d636e;font-size:12px;padding:0 54px;margin-top:28px}
+kbd{background:#232733;border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:11px}
+/* BlockNote dark, matched to the hub */
+.bn-container[data-color-scheme=dark]{--bn-colors-editor-background:var(--bg);--bn-colors-editor-text:var(--text);--bn-colors-menu-background:var(--panel);--bn-colors-menu-text:var(--text);--bn-colors-tooltip-background:#232733;--bn-colors-hovered-background:#232733;--bn-colors-selected-background:#2d3240;--bn-colors-border:var(--line);--bn-colors-side-menu:#5d636e;--bn-font-family:Inter,system-ui,sans-serif;--bn-border-radius:8px}
+.bn-editor{padding-inline:54px!important;font-size:16px;line-height:1.6}
+.bn-block-content[data-content-type=heading][data-level="1"]{font-size:1.75em}
+.bn-block-content[data-content-type=quote] blockquote{border-left-color:var(--acc)!important}
+.bn-editor img{border-radius:6px}
+/* list */
+.list{max-width:900px;margin:0 auto}
+.list-tools{display:flex;gap:8px;padding:16px}
+.search{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--text);font:inherit;font-size:14px;padding:8px 12px;outline:none;min-width:0}
+.rows{display:flex;flex-direction:column;padding:0 16px 40px}
+.row{display:flex;align-items:center;gap:12px;padding:12px 10px;border-bottom:1px solid var(--line);text-decoration:none;color:var(--text);border-radius:6px}
+.row:hover{background:var(--panel)}.row-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* gate */
+.gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.gate-card{max-width:420px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;line-height:1.55}
+/* history */
+.drawer-wrap{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;display:flex;justify-content:flex-end}
+.drawer{width:min(380px,100%);height:100%;overflow:auto;background:var(--panel);border-left:1px solid var(--line);padding:16px}
+.drawer-head{display:flex;align-items:center;margin-bottom:8px}
+.ver{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;display:grid;gap:4px}
+.ver .btn{justify-self:start;margin-top:4px}
+@media (max-width:640px){
+  .hide-sm{display:none}
+  .title-in{font-size:26px;padding:0 16px}
+  .bn-editor{padding-inline:28px 12px!important;font-size:16px}
+  .hint,.note{margin-left:16px;margin-right:16px;padding-left:12px}
+  .hint{padding:0 16px}
+  .page{padding-top:16px}
+  .top{padding:8px 10px;gap:4px}
+  .btn{padding:6px 9px}
+}
+/* dark-friendly highlight + text colours (BlockNote's defaults are light pastel) */
+.bn-container [data-background-color=gray]{background-color:#2c2f36!important}
+.bn-container [data-background-color=brown]{background-color:#3a2e26!important}
+.bn-container [data-background-color=red]{background-color:#43292b!important}
+.bn-container [data-background-color=orange]{background-color:#45311f!important}
+.bn-container [data-background-color=yellow]{background-color:#40371c!important}
+.bn-container [data-background-color=green]{background-color:#21382b!important}
+.bn-container [data-background-color=blue]{background-color:#1f3047!important}
+.bn-container [data-background-color=purple]{background-color:#33284a!important}
+.bn-container [data-background-color=pink]{background-color:#45283a!important}
+.bn-container [data-text-color=gray]{color:#9aa0aa!important}
+.bn-container [data-text-color=brown]{color:#c59b7a!important}
+.bn-container [data-text-color=red]{color:#ef7c7c!important}
+.bn-container [data-text-color=orange]{color:#f0a35e!important}
+.bn-container [data-text-color=yellow]{color:#e8c95a!important}
+.bn-container [data-text-color=green]{color:#6fcf8f!important}
+.bn-container [data-text-color=blue]{color:#6aa8f0!important}
+.bn-container [data-text-color=purple]{color:#b48cf0!important}
+.bn-container [data-text-color=pink]{color:#ef86c0!important}
+.bn-block-content[data-content-type=quote][data-background-color] blockquote{color:var(--text)}
