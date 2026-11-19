@@ -72,6 +72,7 @@ def rich(rt):
 
 
 stats = {}
+SKIPPED = []
 
 
 def conv(b):
@@ -104,16 +105,21 @@ def conv(b):
     elif t == 'divider': blk = {'type': 'divider'}
     elif t == 'code': props['language'] = (v.get('language') or 'text').lower(); blk = {'type': 'codeBlock', 'content': ''.join(r['plain_text'] for r in v['rich_text'])}
     elif t == 'image':
-        src = v.get('file', {}).get('url') or v.get('external', {}).get('url')
-        try: url = upload_image(src)
-        except Exception as e: print('image failed', e); url = src
-        props.update({'url': url, 'caption': ''.join(r['plain_text'] for r in v.get('caption', []))})
-        blk = {'type': 'image'}
+        # Nov 19 rule: media stays in Drive; never copy into Supabase. Notion-hosted files can't preview (their URLs
+        # expire), so they're listed and left out; external image URLs stay as a plain image block.
+        cap = ''.join(r['plain_text'] for r in v.get('caption', []))
+        if v.get('type') == 'external':
+            props.update({'url': v['external']['url'], 'caption': cap}); blk = {'type': 'image'}
+        else:
+            name = (v.get('file', {}).get('url', '').split('?')[0].rsplit('/', 1)[-1]) or 'image'
+            SKIPPED.append(f'Notion-hosted image "{cap or name}" (block {b["id"]})')
+            blk = {'type': 'paragraph', 'content': [{'type': 'text', 'text': f'[Image stayed in Notion, not imported: {cap or name}. Put it in Drive and paste the Drive link here.]', 'styles': {'italic': True, 'textColor': 'gray'}}]}
     elif t == 'table':
         rows = [{'cells': [rich(c) for c in r['table_row']['cells']]} for r in children(b['id'])]
         blk = {'type': 'table', 'content': {'type': 'tableContent', 'rows': rows}}
     elif t in ('bookmark', 'embed', 'link_preview', 'video', 'file', 'pdf'):
         u = v.get('url') or v.get('external', {}).get('url') or v.get('file', {}).get('url', '')
+        if v.get('type') == 'file': SKIPPED.append(f'Notion-hosted {t} (block {b["id"]}): link expires')
         label = ''.join(r['plain_text'] for r in v.get('caption', [])) or u
         blk = {'type': 'paragraph', 'content': [{'type': 'link', 'href': u, 'content': [{'type': 'text', 'text': '🔗 ' + label, 'styles': {}}]}]}
     elif t == 'child_page':
@@ -121,6 +127,7 @@ def conv(b):
     elif t == 'child_database':
         blk = {'type': 'paragraph', 'content': [{'type': 'link', 'href': 'https://www.notion.so/' + b['id'].replace('-', ''), 'content': [{'type': 'text', 'text': '🗂 ' + v.get('title', 'Database') + ' (Notion database, not imported)', 'styles': {}}]}]}
     else:
+        SKIPPED.append(f'{t} block {b["id"]}')
         blk = {'type': 'paragraph', 'content': [{'type': 'text', 'text': f'[Notion {t} block not imported]', 'styles': {'italic': True}}]}
     if props: blk['props'] = props
     if kids: blk['children'] = kids
@@ -156,7 +163,7 @@ def main():
                       (DOC_ID, brief, brand, title, json.dumps(blocks), 'notion-import:' + pid, 'notion-import'))
         c.execute("insert into copy_doc_versions (doc_id, title, content, label, created_by) values (%s,%s,%s,'import','notion-import')",
                   (DOC_ID, title, json.dumps(blocks)))
-    print(json.dumps({'doc_id': DOC_ID, 'title': title, 'top_blocks': len(blocks), 'notion_block_types': stats}))
+    print(json.dumps({'doc_id': DOC_ID, 'title': title, 'top_blocks': len(blocks), 'notion_block_types': stats, 'not_imported': SKIPPED}))
 
 
 if __name__ == '__main__':
